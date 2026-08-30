@@ -1,0 +1,60 @@
+name: release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: build-${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            arch: aarch64
+          - runner: macos-15-intel
+            arch: x86_64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Verify tag version
+        shell: bash
+        run: |
+          version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n 1)
+          test "$GITHUB_REF_NAME" = "v$version"
+      - name: Build release assets
+        env:
+          TARGET: ${{ matrix.arch }}-apple-darwin
+          DIST_DIR: ${{ runner.temp }}/shelve-dist
+        run: make package-release
+      - name: Smoke install
+        env:
+          TARGET: ${{ matrix.arch }}-apple-darwin
+          DIST_DIR: ${{ runner.temp }}/shelve-dist
+        run: make smoke-install
+      - uses: actions/upload-artifact@v6
+        with:
+          name: shelve-macos-${{ matrix.arch }}
+          path: ${{ runner.temp }}/shelve-dist/*
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v7
+        with:
+          path: assets
+          pattern: shelve-macos-*
+          merge-multiple: true
+      - name: Include installer
+        run: cp scripts/install.sh assets/shelve-install.sh
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" assets/* --verify-tag --title "$GITHUB_REF_NAME" --generate-notes --repo "$GITHUB_REPOSITORY"

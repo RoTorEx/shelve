@@ -1,0 +1,24 @@
+# Folders scanned by `shelve move` when no input path is provided.
+inboxes = ["~/Desktop", "~/Downloads"]
+
+# `shelve open` shows every location. Add any folders that matter to you.
+[[locations]]
+group = "Quick Access"
+label = "Home"
+path = "~"
+
+[[locations]]
+group = "Quick Access"
+label = "Desktop"
+path = "~/Desktop"
+
+[[locations]]
+group = "Quick Access"
+label = "Downloads"
+path = "~/Downloads"
+
+[[locations]]
+group = "Quick Access"
+label = "Documents"
+path = "~/Documents"
+move_here = true
