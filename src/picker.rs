@@ -114,6 +114,30 @@ fn shared_parent<'a>(group: &Group<'a>) -> Option<&'a Path> {
     (!base.as_os_str().is_empty()).then_some(base)
 }
 
+fn prompt_line(out: &mut impl Write, action: &str, color: bool) -> io::Result<()> {
+    write!(
+        out,
+        "  {} {} {}: ",
+        paint(color, "94", ">"),
+        paint(color, "1", action),
+        paint(color, "2", "<sector><position>")
+    )?;
+    out.flush()
+}
+
+fn display_path(path: &Path) -> String {
+    if let Some(home) = std::env::var_os("HOME")
+        && let Ok(relative) = path.strip_prefix(Path::new(&home))
+    {
+        return if relative.as_os_str().is_empty() {
+            "~".into()
+        } else {
+            format!("~/{}", relative.display())
+        };
+    }
+    path.display().to_string()
+}
+
 fn render(
     out: &mut impl Write,
     title: &str,
@@ -132,9 +156,20 @@ fn render(
         out,
         "\n  {} {} {}",
         paint(color, "2", "--------------"),
-        paint(color, "94", title),
+        paint(
+            color,
+            "94",
+            if title.starts_with("Move ") {
+                "Folders"
+            } else {
+                title
+            }
+        ),
         paint(color, "2", "--------------")
     )?;
+    if let Some(file) = title.strip_prefix("Move ") {
+        writeln!(out, "\n  {} {}", paint(color, "1", "File:"), file)?;
+    }
     for (index, group) in groups(locations).iter().enumerate() {
         if !group
             .locations
@@ -150,7 +185,7 @@ fn render(
                     .filter(|path| !path.as_os_str().is_empty())
                     .unwrap_or(root)
             })
-            .map(|path| format!(" ({}/)", path.display().to_string().trim_end_matches('/')))
+            .map(|path| format!(" ({}/)", display_path(path).trim_end_matches('/')))
             .unwrap_or_default();
         writeln!(
             out,
@@ -205,15 +240,8 @@ fn prompt(
     color: bool,
 ) -> Result<Option<Location>, String> {
     loop {
-        write!(
-            out,
-            "  {} {} {}: ",
-            paint(color, "94", ">"),
-            paint(color, "1", if move_only { "move to" } else { "open" }),
-            paint(color, "2", "<sector><position>")
-        )
-        .and_then(|_| out.flush())
-        .map_err(|e| e.to_string())?;
+        prompt_line(out, if move_only { "move to" } else { "open" }, color)
+            .map_err(|e| e.to_string())?;
         let mut line = String::new();
         input
             .read_line(&mut line)
@@ -295,18 +323,10 @@ pub(crate) fn choose_sources(
         && std::env::var_os("NO_COLOR").is_none()
         && std::env::var("TERM").is_ok_and(|term| term != "dumb");
     let mut out = io::stderr().lock();
-    render(&mut out, "Files to move", &locations, false, color).map_err(|e| e.to_string())?;
+    render(&mut out, "Files", &locations, false, color).map_err(|e| e.to_string())?;
     let mut input = io::stdin().lock();
     loop {
-        write!(
-            out,
-            "  {} {} {}: ",
-            paint(color, "94", ">"),
-            paint(color, "1", "move which files"),
-            paint(color, "2", "<A1 A3 ...>")
-        )
-        .and_then(|_| out.flush())
-        .map_err(|e| e.to_string())?;
+        prompt_line(&mut out, "move", color).map_err(|e| e.to_string())?;
         let mut line = String::new();
         input.read_line(&mut line).map_err(|e| e.to_string())?;
         let choice = line.trim();

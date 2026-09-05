@@ -51,3 +51,8 @@ any destination questions. This applies to inbox scans and explicit file or
 directory arguments. Empty input or EOF cancels; no source is selected by
 default. Multiple codes are allowed, duplicates are removed, and any invalid
 code rejects the entire selection. Folder-root codes cannot select files.
+
+Source and destination menus use the same renderer and prompt styling as open.
+Source headings say Files; destinations say Folders, with the source filename
+on a separate line so long filenames do not expand the divider. Home paths
+use `~` consistently. Multi-file codes remain space- or comma-separated.
