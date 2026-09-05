@@ -6,6 +6,8 @@ Tracks real product and release progress.
 
 ### Changed
 
+- Matched Hop’s bright-blue headings and prompt marker, bold action, and dim selector placeholder.
+
 - Matched Hop menu formatting, parent-path headings, and concise input prompt.
 
 - Display actual filesystem names and support opening group roots with selectors such as A0.

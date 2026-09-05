@@ -132,7 +132,7 @@ fn render(
         out,
         "\n  {} {} {}",
         paint(color, "2", "--------------"),
-        paint(color, "34", title),
+        paint(color, "94", title),
         paint(color, "2", "--------------")
     )?;
     for (index, group) in groups(locations).iter().enumerate() {
@@ -202,11 +202,18 @@ fn prompt(
     out: &mut impl Write,
     locations: &[Location],
     move_only: bool,
+    color: bool,
 ) -> Result<Option<Location>, String> {
     loop {
-        write!(out, "  > open <sector><position>: ")
-            .and_then(|_| out.flush())
-            .map_err(|e| e.to_string())?;
+        write!(
+            out,
+            "  {} {} {}: ",
+            paint(color, "94", ">"),
+            paint(color, "1", if move_only { "move to" } else { "open" }),
+            paint(color, "2", "<sector><position>")
+        )
+        .and_then(|_| out.flush())
+        .map_err(|e| e.to_string())?;
         let mut line = String::new();
         input
             .read_line(&mut line)
@@ -232,7 +239,13 @@ pub(crate) fn choose(
         && std::env::var("TERM").is_ok_and(|term| term != "dumb");
     let mut out = io::stderr().lock();
     render(&mut out, title, locations, move_only, color).map_err(|e| e.to_string())?;
-    prompt(&mut io::stdin().lock(), &mut out, locations, move_only)
+    prompt(
+        &mut io::stdin().lock(),
+        &mut out,
+        locations,
+        move_only,
+        color,
+    )
 }
 
 #[cfg(test)]
@@ -342,7 +355,7 @@ mod tests {
     fn invalid_input_retries_and_eof_or_empty_input_cancels() {
         let locations = locations();
         let mut out = Vec::new();
-        let selected = prompt(&mut &b"Z8\nb2\n"[..], &mut out, &locations, false)
+        let selected = prompt(&mut &b"Z8\nb2\n"[..], &mut out, &locations, false, false)
             .unwrap()
             .unwrap();
         assert_eq!(selected.label, "Invoices");
@@ -353,9 +366,15 @@ mod tests {
         );
         for input in ["", "\n", "q\n"] {
             assert!(
-                prompt(&mut input.as_bytes(), &mut Vec::new(), &locations, false)
-                    .unwrap()
-                    .is_none()
+                prompt(
+                    &mut input.as_bytes(),
+                    &mut Vec::new(),
+                    &locations,
+                    false,
+                    false
+                )
+                .unwrap()
+                .is_none()
             );
         }
     }

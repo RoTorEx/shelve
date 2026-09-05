@@ -41,3 +41,6 @@ shown only when a folder is deeper than the group root.
 The menu follows Hop’s spacing and color roles, with a dim version and dividers,
 a parent path in each sector heading, and a single short input prompt. Usage
 help stays in documentation rather than appearing below every menu.
+
+Use Hop’s exact ANSI roles: bright blue (94) for heading and prompt marker,
+bold (1) for the prompt action, and dim (2) for the selector placeholder.
