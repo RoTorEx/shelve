@@ -33,7 +33,11 @@ permanent IDs. Both open and move use the full config to assign codes, so PDF
 filtering never changes a destination's selector or allows an open-only folder.
 
 Group headers and folder names come from actual path components, never custom
-labels. Headers show the common root path. `<letter>0` opens that root without
+labels. Headers show the root name followed by its parent path, matching Hop. `<letter>0` opens that root without
 adding a numbered root entry; folders start at 1. Root shortcuts are open-only
 and cannot be used to bypass `move_here` restrictions. Relative path context is
 shown only when a folder is deeper than the group root.
+
+The menu follows Hop’s spacing and color roles, with a dim version and dividers,
+a parent path in each sector heading, and a single short input prompt. Usage
+help stays in documentation rather than appearing below every menu.

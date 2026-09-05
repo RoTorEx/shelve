@@ -6,6 +6,8 @@ Tracks real product and release progress.
 
 ### Changed
 
+- Matched Hop menu formatting, parent-path headings, and concise input prompt.
+
 - Display actual filesystem names and support opening group roots with selectors such as A0.
 
 - Made bare `shelve` open the menu and added filesystem context to group and folder labels.

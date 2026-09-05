@@ -123,15 +123,17 @@ fn render(
 ) -> io::Result<()> {
     writeln!(
         out,
-        "\n  {} {} (v{})",
+        "\n  {} {} {}",
         paint(color, "33", "*"),
         paint(color, "1", "Shelve"),
-        env!("CARGO_PKG_VERSION")
+        paint(color, "2", &format!("(v{})", env!("CARGO_PKG_VERSION")))
     )?;
     writeln!(
         out,
-        "\n  -------------- {} --------------",
-        paint(color, "34", title)
+        "\n  {} {} {}",
+        paint(color, "2", "--------------"),
+        paint(color, "34", title),
+        paint(color, "2", "--------------")
     )?;
     for (index, group) in groups(locations).iter().enumerate() {
         if !group
@@ -143,6 +145,11 @@ fn render(
         }
         let parent = shared_parent(group);
         let context = parent
+            .map(|root| {
+                root.parent()
+                    .filter(|path| !path.as_os_str().is_empty())
+                    .unwrap_or(root)
+            })
             .map(|path| format!(" ({}/)", path.display().to_string().trim_end_matches('/')))
             .unwrap_or_default();
         writeln!(
@@ -187,10 +194,7 @@ fn render(
             }
         }
     }
-    writeln!(
-        out,
-        "\n  Type a code such as A1, then Enter. A0 opens the group root. Empty input or q cancels.\n"
-    )
+    writeln!(out)
 }
 
 fn prompt(
@@ -200,7 +204,7 @@ fn prompt(
     move_only: bool,
 ) -> Result<Option<Location>, String> {
     loop {
-        write!(out, "  > select <group><number>: ")
+        write!(out, "  > open <sector><position>: ")
             .and_then(|_| out.flush())
             .map_err(|e| e.to_string())?;
         let mut line = String::new();
@@ -308,7 +312,7 @@ mod tests {
         let mut out = Vec::new();
         render(&mut out, "Open folder", &locations, false, false).unwrap();
         let text = String::from_utf8(out).unwrap();
-        assert!(text.contains("A.  Business (~/Documents/Business/)"));
+        assert!(text.contains("A.  Business (~/Documents/)"));
         assert!(text.contains("1) In Invoices"));
         assert!(!text.contains("Custom"));
         assert!(!text.lines().any(|line| line.trim_start().starts_with("0)")));
