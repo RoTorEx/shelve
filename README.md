@@ -3,7 +3,7 @@
 A tiny macOS CLI for opening important folders and shelving PDFs:
 
 ```text
-shelve open
+shelve open [SELECTOR]
 shelve move [FILE_OR_DIRECTORY ...]
 shelve update
 ```
@@ -16,10 +16,17 @@ Check the installed version with `shelve -V`. `shelve update` downloads the
 latest compatible macOS release, verifies its checksum, and replaces the
 current binary.
 
-The folder picker groups destinations in a two-pane terminal interface. Use
-`↑`/`↓` (or `j`/`k`) to move, `Enter` to select, and `Esc` to cancel. Navigation
-stops at the first and last destination instead of wrapping around. The neutral,
-high-contrast palette follows the terminal's own foreground and background.
+The folder menu follows Hop: lettered groups (`A`, `B`, …) and numbered
+folders (`1`, `2`, …), with blank lines between groups and indented entries.
+Type `B2` and press Enter to choose a folder. Codes are case-insensitive.
+Empty input or `q` followed by Enter cancels. The menu stays in terminal
+scrollback, so you can scroll to review all groups.
+
+Use `shelve open B2` to open a known destination directly. Codes follow config
+order and remain the same in `open` and `move`; PDF selection shows only folders
+with `move_here = true`. Editing config order can change codes. Color follows
+Hop's group/number/folder hierarchy and is disabled for redirected output,
+`NO_COLOR`, or a dumb terminal.
 
 ## Install from GitHub
 
@@ -58,7 +65,3 @@ make run
 ## License
 
 MIT
-
-The picker separates groups with blank rows, indents folders below their group,
-and keeps the selected folder and wrapped path in a padded detail pane. Narrow
-terminals stack the panes; very small terminals show a resize hint.

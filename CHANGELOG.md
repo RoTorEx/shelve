@@ -6,7 +6,8 @@ Tracks real product and release progress.
 
 ### Changed
 
-- Improved picker readability with panel padding, a gutter, deeper folder indentation, separated detail fields, and responsive help and resize hints.
+- Replaced the two-pane picker with a Hop-style menu: lettered groups, numbered folders, spaced sections, and typed selectors.
+- Added direct `shelve open A1` navigation; PDF destinations retain their open-menu codes.
 
 ## [0.1.0] - 2026-08-31
 

@@ -1,0 +1,259 @@
+use crate::Location;
+use std::io::{self, BufRead, IsTerminal, Write};
+
+struct Group<'a> {
+    name: &'a str,
+    locations: Vec<&'a Location>,
+}
+
+fn groups(locations: &[Location]) -> Vec<Group<'_>> {
+    let mut groups: Vec<Group<'_>> = Vec::new();
+    for location in locations {
+        if let Some(group) = groups.iter_mut().find(|group| group.name == location.group) {
+            group.locations.push(location);
+        } else {
+            groups.push(Group {
+                name: &location.group,
+                locations: vec![location],
+            });
+        }
+    }
+    groups
+}
+
+fn group_label(mut index: usize) -> String {
+    let mut label = Vec::new();
+    loop {
+        label.push(b'A' + (index % 26) as u8);
+        if index < 26 {
+            break;
+        }
+        index = index / 26 - 1;
+    }
+    label.reverse();
+    String::from_utf8(label).expect("ASCII group label")
+}
+
+pub(crate) fn resolve<'a>(
+    locations: &'a [Location],
+    input: &str,
+    move_only: bool,
+) -> Result<&'a Location, String> {
+    let choice = input.trim();
+    let split = choice
+        .find(|c: char| !c.is_ascii_alphabetic())
+        .unwrap_or(choice.len());
+    let (label, number) = choice.split_at(split);
+    let number = number.trim();
+    if label.is_empty() || number.is_empty() || !number.bytes().all(|b| b.is_ascii_digit()) {
+        return Err("use a group letter and folder number, for example A1".into());
+    }
+    let index = number.parse::<usize>().ok().and_then(|n| n.checked_sub(1));
+    let grouped = groups(locations);
+    let location = grouped
+        .iter()
+        .enumerate()
+        .find(|(i, _)| group_label(*i).eq_ignore_ascii_case(label))
+        .and_then(|(_, group)| index.and_then(|i| group.locations.get(i).copied()))
+        .ok_or_else(|| format!("unknown destination: {choice}"))?;
+    if move_only && !location.move_here {
+        return Err(format!("{choice} is not a PDF move destination"));
+    }
+    Ok(location)
+}
+
+fn paint(color: bool, code: &str, text: &str) -> String {
+    if color {
+        format!("\x1b[{code}m{text}\x1b[0m")
+    } else {
+        text.into()
+    }
+}
+
+fn render(
+    out: &mut impl Write,
+    title: &str,
+    locations: &[Location],
+    move_only: bool,
+    color: bool,
+) -> io::Result<()> {
+    writeln!(
+        out,
+        "\n  {} {}",
+        paint(color, "33", "*"),
+        paint(color, "1", "Shelve")
+    )?;
+    writeln!(
+        out,
+        "\n  -------------- {} --------------",
+        paint(color, "34", title)
+    )?;
+    for (index, group) in groups(locations).iter().enumerate() {
+        if !group
+            .locations
+            .iter()
+            .any(|location| !move_only || location.move_here)
+        {
+            continue;
+        }
+        writeln!(
+            out,
+            "\n  {}.  {}",
+            paint(color, "33", &group_label(index)),
+            paint(color, "1", group.name)
+        )?;
+        for (index, location) in group.locations.iter().enumerate() {
+            if !move_only || location.move_here {
+                writeln!(
+                    out,
+                    "     {} {}",
+                    paint(color, "36", &format!("{:>2})", index + 1)),
+                    paint(color, "32", &location.label)
+                )?;
+            }
+        }
+    }
+    writeln!(
+        out,
+        "\n  Type a code such as A1, then Enter. Empty input or q cancels.\n"
+    )
+}
+
+fn prompt(
+    input: &mut impl BufRead,
+    out: &mut impl Write,
+    locations: &[Location],
+    move_only: bool,
+) -> Result<Option<Location>, String> {
+    loop {
+        write!(out, "  > ")
+            .and_then(|_| out.flush())
+            .map_err(|e| e.to_string())?;
+        let mut line = String::new();
+        input
+            .read_line(&mut line)
+            .map_err(|e| format!("cannot read selection: {e}"))?;
+        let choice = line.trim();
+        if choice.is_empty() || choice.eq_ignore_ascii_case("q") || choice == "\u{1b}" {
+            return Ok(None);
+        }
+        match resolve(locations, choice, move_only) {
+            Ok(location) => return Ok(Some(location.clone())),
+            Err(error) => writeln!(out, "\n  {error}\n").map_err(|e| e.to_string())?,
+        }
+    }
+}
+
+pub(crate) fn choose(
+    title: &str,
+    locations: &[Location],
+    move_only: bool,
+) -> Result<Option<Location>, String> {
+    let color = io::stderr().is_terminal()
+        && std::env::var_os("NO_COLOR").is_none()
+        && std::env::var("TERM").is_ok_and(|term| term != "dumb");
+    let mut out = io::stderr().lock();
+    render(&mut out, title, locations, move_only, color).map_err(|e| e.to_string())?;
+    prompt(&mut io::stdin().lock(), &mut out, locations, move_only)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn locations() -> Vec<Location> {
+        [
+            ("Home", "Desktop", false),
+            ("Business", "Root", false),
+            ("Business", "Invoices", true),
+            ("Home", "Downloads", false),
+        ]
+        .into_iter()
+        .map(|(group, label, move_here)| Location {
+            group: group.into(),
+            label: label.into(),
+            path: format!("/{label}"),
+            move_here,
+        })
+        .collect()
+    }
+
+    #[test]
+    fn selectors_group_nonadjacent_entries_and_accept_lowercase() {
+        let locations = locations();
+        assert_eq!(
+            resolve(&locations, " a2 ", false).unwrap().label,
+            "Downloads"
+        );
+        assert_eq!(resolve(&locations, "B 2", false).unwrap().label, "Invoices");
+        for choice in [
+            "",
+            "A",
+            "1",
+            "A0",
+            "A3",
+            "Z1",
+            "A-1",
+            "A1x",
+            "А1",
+            "A999999999999999999999999999999",
+        ] {
+            assert!(resolve(&locations, choice, false).is_err(), "{choice}");
+        }
+    }
+
+    #[test]
+    fn move_menu_preserves_codes_and_rejects_open_only_destinations() {
+        let locations = locations();
+        assert_eq!(resolve(&locations, "B2", true).unwrap().label, "Invoices");
+        assert!(resolve(&locations, "B1", true).is_err());
+        let mut out = Vec::new();
+        render(&mut out, "Move PDF", &locations, true, false).unwrap();
+        let text = String::from_utf8(out).unwrap();
+        assert!(text.contains("\n\n  B.  Business\n      2) Invoices"));
+        assert!(!text.contains("Desktop"));
+        assert!(!text.contains("\x1b["));
+    }
+
+    #[test]
+    fn supports_multiletter_groups_and_multidigit_positions() {
+        assert_eq!(group_label(25), "Z");
+        assert_eq!(group_label(26), "AA");
+        let mut locations = locations();
+        for i in 0..27 {
+            locations.push(Location {
+                group: format!("Group {i}"),
+                label: "Folder".into(),
+                path: "/folder".into(),
+                move_here: false,
+            });
+        }
+        assert_eq!(resolve(&locations, "AA1", false).unwrap().group, "Group 24");
+        for _ in 0..10 {
+            locations.push(locations[0].clone());
+        }
+        assert_eq!(resolve(&locations, "A12", false).unwrap().label, "Desktop");
+    }
+
+    #[test]
+    fn invalid_input_retries_and_eof_or_empty_input_cancels() {
+        let locations = locations();
+        let mut out = Vec::new();
+        let selected = prompt(&mut &b"Z8\nb2\n"[..], &mut out, &locations, false)
+            .unwrap()
+            .unwrap();
+        assert_eq!(selected.label, "Invoices");
+        assert!(
+            String::from_utf8(out)
+                .unwrap()
+                .contains("unknown destination")
+        );
+        for input in ["", "\n", "q\n"] {
+            assert!(
+                prompt(&mut input.as_bytes(), &mut Vec::new(), &locations, false)
+                    .unwrap()
+                    .is_none()
+            );
+        }
+    }
+}
