@@ -8,7 +8,7 @@ shelve move [FILE_OR_DIRECTORY ...]
 shelve update
 ```
 
-`open` chooses a configured folder and opens it in Finder. `move` finds PDFs,
+Running `shelve` without arguments opens the folder menu. `open` chooses a configured folder and opens it in Finder. `move` finds PDFs,
 asks for a destination for each file, prints one batch preview, and moves only
 after confirmation. Existing files are never overwritten.
 
@@ -65,3 +65,8 @@ make run
 ## License
 
 MIT
+
+Group headers show the common base directory. Entries show relative paths when
+labels differ from filesystem names; `.` means the group directory itself.
+Without a common base, entries show their complete configured paths. Every
+destination can therefore be located from the menu without guessing its label.

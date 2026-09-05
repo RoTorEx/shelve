@@ -6,6 +6,8 @@ Tracks real product and release progress.
 
 ### Changed
 
+- Made bare `shelve` open the menu and added filesystem context to group and folder labels.
+
 - Replaced the two-pane picker with a Hop-style menu: lettered groups, numbered folders, spaced sections, and typed selectors.
 - Added direct `shelve open A1` navigation; PDF destinations retain their open-menu codes.
 

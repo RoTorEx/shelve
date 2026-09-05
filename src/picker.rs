@@ -1,5 +1,8 @@
 use crate::Location;
-use std::io::{self, BufRead, IsTerminal, Write};
+use std::{
+    io::{self, BufRead, IsTerminal, Write},
+    path::Path,
+};
 
 struct Group<'a> {
     name: &'a str,
@@ -70,6 +73,21 @@ fn paint(color: bool, code: &str, text: &str) -> String {
     }
 }
 
+fn shared_parent<'a>(group: &Group<'a>) -> Option<&'a Path> {
+    let first = Path::new(&group.locations.first()?.path);
+    let mut base = if group.locations.len() == 1 {
+        first.parent()?
+    } else {
+        first
+    };
+    for location in &group.locations {
+        while !Path::new(&location.path).starts_with(base) {
+            base = base.parent()?;
+        }
+    }
+    (!base.as_os_str().is_empty()).then_some(base)
+}
+
 fn render(
     out: &mut impl Write,
     title: &str,
@@ -79,9 +97,10 @@ fn render(
 ) -> io::Result<()> {
     writeln!(
         out,
-        "\n  {} {}",
+        "\n  {} {} (v{})",
         paint(color, "33", "*"),
-        paint(color, "1", "Shelve")
+        paint(color, "1", "Shelve"),
+        env!("CARGO_PKG_VERSION")
     )?;
     writeln!(
         out,
@@ -96,19 +115,43 @@ fn render(
         {
             continue;
         }
+        let parent = shared_parent(group);
+        let context = parent
+            .map(|path| format!(" ({}/)", path.display().to_string().trim_end_matches('/')))
+            .unwrap_or_default();
         writeln!(
             out,
-            "\n  {}.  {}",
+            "\n  {}.  {}{}",
             paint(color, "33", &group_label(index)),
-            paint(color, "1", group.name)
+            paint(color, "1", group.name),
+            paint(color, "90", &context)
         )?;
         for (index, location) in group.locations.iter().enumerate() {
             if !move_only || location.move_here {
+                let path = match parent {
+                    Some(parent) => Path::new(&location.path)
+                        .strip_prefix(parent)
+                        .unwrap_or(Path::new(&location.path)),
+                    None => Path::new(&location.path),
+                };
+                let context = if parent.is_some() && path.to_string_lossy() == location.label {
+                    String::new()
+                } else {
+                    format!(
+                        " ({})",
+                        if path.as_os_str().is_empty() {
+                            ".".into()
+                        } else {
+                            path.display().to_string()
+                        }
+                    )
+                };
                 writeln!(
                     out,
-                    "     {} {}",
+                    "     {} {}{}",
                     paint(color, "36", &format!("{:>2})", index + 1)),
-                    paint(color, "32", &location.label)
+                    paint(color, "32", &location.label),
+                    paint(color, "90", &context)
                 )?;
             }
         }
@@ -126,7 +169,7 @@ fn prompt(
     move_only: bool,
 ) -> Result<Option<Location>, String> {
     loop {
-        write!(out, "  > ")
+        write!(out, "  > select <group><number>: ")
             .and_then(|_| out.flush())
             .map_err(|e| e.to_string())?;
         let mut line = String::new();
@@ -210,7 +253,7 @@ mod tests {
         let mut out = Vec::new();
         render(&mut out, "Move PDF", &locations, true, false).unwrap();
         let text = String::from_utf8(out).unwrap();
-        assert!(text.contains("\n\n  B.  Business\n      2) Invoices"));
+        assert!(text.contains("\n\n  B.  Business (/)\n      2) Invoices"));
         assert!(!text.contains("Desktop"));
         assert!(!text.contains("\x1b["));
     }

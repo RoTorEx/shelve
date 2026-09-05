@@ -61,7 +61,8 @@ fn run() -> Result<(), String> {
             println!("shelve {}", env!("CARGO_PKG_VERSION"));
             Ok(())
         }
-        Some("--help" | "-h") | None => {
+        None => open_location(load_config()?, None),
+        Some("--help" | "-h") => {
             print_help();
             Ok(())
         }
@@ -71,7 +72,7 @@ fn run() -> Result<(), String> {
 
 fn print_help() {
     println!(
-        "shelve {}\n\nUsage:\n  shelve open [SELECTOR]\n  shelve move [FILE_OR_DIRECTORY ...]\n  shelve update\n\nCommands:\n  open    Choose a configured folder and open it in Finder\n  move    Choose destinations, preview, and move PDFs\n  update  Install the latest compatible GitHub Release\n\nOptions:\n  -h, --help     Print help\n  -V, --version  Print version",
+        "shelve {}\n\nUsage:\n  shelve\n  shelve open [SELECTOR]\n  shelve move [FILE_OR_DIRECTORY ...]\n  shelve update\n\nCommands:\n  open    Choose a configured folder and open it in Finder\n  move    Choose destinations, preview, and move PDFs\n  update  Install the latest compatible GitHub Release\n\nOptions:\n  -h, --help     Print help\n  -V, --version  Print version",
         env!("CARGO_PKG_VERSION")
     );
 }

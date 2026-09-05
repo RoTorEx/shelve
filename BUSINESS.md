@@ -2,7 +2,7 @@
 
 Shelve is a small, local macOS CLI for three jobs:
 
-- `shelve open` is a universal shortcut to important configured folders and
+- `shelve` (or `shelve open`) is a universal shortcut to important configured folders and
   opens the selected folder in Finder.
 - `shelve move` lets the user choose destinations for PDFs, previews the batch,
   and moves it after one confirmation.
@@ -31,3 +31,8 @@ within their group. Repeated group names form one group. Letters continue after
 Z as AA, AB, etc.; folder positions are one-based. Selectors are positions, not
 permanent IDs. Both open and move use the full config to assign codes, so PDF
 filtering never changes a destination's selector or allows an open-only folder.
+
+Group headers show the common base directory. Entries show relative paths when
+labels differ from filesystem names; `.` means the group directory itself.
+Without a common base, entries show their complete configured paths. Every
+destination can therefore be located from the menu without guessing its label.
