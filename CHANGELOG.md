@@ -4,6 +4,8 @@ Tracks real product and release progress.
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-09-05
+
 ### Changed
 
 - Replaced the two-pane picker with Hop-style lettered sectors, numbered entries, actual folder names, and parent paths.
