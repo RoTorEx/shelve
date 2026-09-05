@@ -58,3 +58,7 @@ make run
 ## License
 
 MIT
+
+The picker separates groups with blank rows, indents folders below their group,
+and keeps the selected folder and wrapped path in a padded detail pane. Narrow
+terminals stack the panes; very small terminals show a resize hint.

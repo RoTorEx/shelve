@@ -20,3 +20,7 @@ config.
 
 The `open` and `move` flows remain local. Network access is limited to the
 explicit `update` command and installation from GitHub Releases.
+
+Folder navigation must remain easy to scan: distinct group headers, indented
+folder names, space between panels, and separate group, folder, and path fields.
+Long paths wrap in the detail pane; narrow terminals stack the panes.

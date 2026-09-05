@@ -10,7 +10,7 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span, Text},
-    widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap},
+    widgets::{Block, Borders, List, ListItem, ListState, Padding, Paragraph, Wrap},
 };
 use serde::Deserialize;
 use std::{
@@ -373,6 +373,14 @@ impl Drop for PickerTerminalGuard {
 
 fn draw_location_picker(frame: &mut ratatui::Frame, picker: &mut LocationPicker, title: &str) {
     let area = frame.area();
+    if area.width < 32 || area.height < 12 || (area.width < 72 && area.height < 20) {
+        frame.render_widget(
+            Paragraph::new("Enlarge terminal (72 × 12 or 32 × 20). Esc to cancel.")
+                .wrap(Wrap { trim: true }),
+            area,
+        );
+        return;
+    }
     let rows = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Min(0), Constraint::Length(1)])
@@ -380,12 +388,17 @@ fn draw_location_picker(frame: &mut ratatui::Frame, picker: &mut LocationPicker,
     let body = if area.width >= 72 {
         Layout::default()
             .direction(Direction::Horizontal)
-            .constraints([Constraint::Percentage(58), Constraint::Percentage(42)])
+            .spacing(1)
+            .constraints([Constraint::Percentage(55), Constraint::Percentage(45)])
             .split(rows[0])
     } else {
         Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Min(5), Constraint::Length(7)])
+            .spacing(1)
+            .constraints([
+                Constraint::Min(3),
+                Constraint::Length((area.height / 2).clamp(11, 14)),
+            ])
             .split(rows[0])
     };
 
@@ -397,15 +410,21 @@ fn draw_location_picker(frame: &mut ratatui::Frame, picker: &mut LocationPicker,
     } else {
         format!("{}/{}", picker.selected + 1, picker.selectable.len())
     };
-    let status = Line::from(vec![
-        Span::styled(" ↑/↓ ", Style::default().add_modifier(Modifier::BOLD)),
-        Span::raw("navigate  "),
-        Span::styled("Enter ", Style::default().add_modifier(Modifier::BOLD)),
-        Span::raw("select  "),
-        Span::styled("Esc ", Style::default().add_modifier(Modifier::BOLD)),
-        Span::raw("cancel"),
-        Span::styled(format!("  {position} "), Style::default().fg(Color::Gray)),
-    ]);
+    let status = if area.width < 40 {
+        Line::from(format!("↑↓ move · Enter · Esc  {position}"))
+    } else if area.width < 60 {
+        Line::from(format!("↑/↓ move · Enter select · Esc back  {position}"))
+    } else {
+        Line::from(vec![
+            Span::styled(" ↑/↓ ", Style::default().add_modifier(Modifier::BOLD)),
+            Span::raw("navigate  ·  "),
+            Span::styled("Enter ", Style::default().add_modifier(Modifier::BOLD)),
+            Span::raw("select  ·  "),
+            Span::styled("Esc ", Style::default().add_modifier(Modifier::BOLD)),
+            Span::raw("cancel"),
+            Span::styled(format!("  {position} "), Style::default().fg(Color::Gray)),
+        ])
+    };
     frame.render_widget(Paragraph::new(status).alignment(Alignment::Center), rows[1]);
 }
 
@@ -419,7 +438,8 @@ fn draw_location_list(
         .title(format!(" {title} "))
         .title_style(Style::default().add_modifier(Modifier::BOLD))
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Gray));
+        .border_style(Style::default().fg(Color::Gray))
+        .padding(Padding::new(1, 1, u16::from(area.height >= 10), 0));
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
@@ -435,9 +455,10 @@ fn draw_location_list(
                     Style::default().add_modifier(Modifier::BOLD),
                 ),
             ])),
-            PickerEntry::Location(index) => {
-                ListItem::new(Line::from(format!("  {}", picker.locations[*index].label)))
-            }
+            PickerEntry::Location(index) => ListItem::new(Line::from(format!(
+                "    {}",
+                picker.locations[*index].label
+            ))),
         })
         .collect();
     let list = List::new(items)
@@ -457,7 +478,8 @@ fn draw_location_detail(frame: &mut ratatui::Frame, picker: &LocationPicker, are
         .title(" Destination ")
         .title_style(Style::default().add_modifier(Modifier::BOLD))
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Gray));
+        .border_style(Style::default().fg(Color::Gray))
+        .padding(Padding::new(1, 1, u16::from(area.height >= 10), 0));
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
@@ -465,15 +487,17 @@ fn draw_location_detail(frame: &mut ratatui::Frame, picker: &LocationPicker, are
         return;
     };
     let detail = Text::from(vec![
-        Line::from(Span::styled(
-            location.group.as_str(),
-            Style::default().add_modifier(Modifier::BOLD),
-        )),
+        Line::from(format!("Group: {}", location.group)),
+        Line::default(),
         Line::from(Span::styled(
             location.label.as_str(),
             Style::default().add_modifier(Modifier::BOLD),
         )),
         Line::default(),
+        Line::from(Span::styled(
+            "Path",
+            Style::default().add_modifier(Modifier::BOLD),
+        )),
         Line::from(location.path.as_str()),
     ]);
     frame.render_widget(Paragraph::new(detail).wrap(Wrap { trim: false }), inner);
@@ -656,6 +680,65 @@ mod tests {
             !matches!(cell.fg, Color::Cyan | Color::DarkGray)
                 && !matches!(cell.bg, Color::Cyan | Color::DarkGray)
         }));
+    }
+
+    #[test]
+    fn long_paths_remain_readable_in_wide_and_stacked_layouts() {
+        let path = "~/Documents/WorkSpace/Business/PL JDG/In Bank Confirmations";
+        for (width, height) in [(100, 28), (50, 28), (40, 24), (32, 20)] {
+            let mut picker = LocationPicker::new(vec![Location {
+                group: "Business".into(),
+                label: "Bank Confirmations".into(),
+                path: path.into(),
+                move_here: true,
+            }]);
+            let mut terminal =
+                Terminal::new(ratatui::backend::TestBackend::new(width, height)).unwrap();
+            terminal
+                .draw(|frame| draw_location_picker(frame, &mut picker, "Open folder"))
+                .unwrap();
+            let buffer = terminal.backend().buffer();
+            let lines: Vec<String> = (0..height)
+                .map(|y| (0..width).map(|x| buffer[(x, y)].symbol()).collect())
+                .collect();
+            assert!(lines.iter().any(|line| line.contains("Group: Business")));
+            assert!(lines.iter().any(|line| line.contains("Bank Confirmations")));
+            assert!(lines.iter().any(|line| line.contains("Path")));
+            assert!(lines.last().unwrap().contains("1/1"));
+            let compact: String = lines
+                .join("")
+                .chars()
+                .filter(|c| !c.is_whitespace() && !"│─┌┐└┘".contains(*c))
+                .collect();
+            let compact_path: String = path.chars().filter(|c| !c.is_whitespace()).collect();
+            // Stacked panes leave uninterrupted wrapped path lines.
+            if width < 72 {
+                assert!(
+                    compact.contains(&compact_path),
+                    "{width}x{height}: {lines:?}"
+                );
+            }
+            if std::env::var_os("SHELVE_RENDER_PREVIEW").is_some() {
+                println!("{width}x{height}\n{}", lines.join("\n"));
+            }
+        }
+    }
+
+    #[test]
+    fn tiny_terminal_shows_resize_hint() {
+        let mut picker = LocationPicker::new(Vec::new());
+        let mut terminal = Terminal::new(ratatui::backend::TestBackend::new(30, 8)).unwrap();
+        terminal
+            .draw(|frame| draw_location_picker(frame, &mut picker, "Open folder"))
+            .unwrap();
+        let rendered: String = terminal
+            .backend()
+            .buffer()
+            .content()
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect();
+        assert!(rendered.contains("Enlarge terminal"));
     }
 
     #[test]
