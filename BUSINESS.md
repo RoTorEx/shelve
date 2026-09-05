@@ -2,7 +2,7 @@
 
 Shelve is a small, local macOS CLI for three jobs:
 
-- `shelve` (or `shelve open`) is a universal shortcut to important configured folders and
+- `shelve open` is a universal shortcut to important configured folders and
   opens the selected folder in Finder.
 - `shelve move` lets the user choose destinations for PDFs, previews the batch,
   and moves it after one confirmation.
@@ -44,3 +44,10 @@ help stays in documentation rather than appearing below every menu.
 
 Use Hop’s exact ANSI roles: bright blue (94) for heading and prompt marker,
 bold (1) for the prompt action, and dim (2) for the selector placeholder.
+
+Bare `shelve` shows help and never opens a picker. `shelve move` treats discovered
+PDFs only as candidates: the user must choose individual source codes before
+any destination questions. This applies to inbox scans and explicit file or
+directory arguments. Empty input or EOF cancels; no source is selected by
+default. Multiple codes are allowed, duplicates are removed, and any invalid
+code rejects the entire selection. Folder-root codes cannot select files.

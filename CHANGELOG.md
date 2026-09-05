@@ -6,6 +6,9 @@ Tracks real product and release progress.
 
 ### Changed
 
+- Ask which source PDFs to move before choosing destinations; no files are preselected.
+- Bare `shelve` shows help again; use `shelve open` for folder navigation.
+
 - Matched Hop’s bright-blue headings and prompt marker, bold action, and dim selector placeholder.
 
 - Matched Hop menu formatting, parent-path headings, and concise input prompt.

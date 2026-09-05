@@ -8,8 +8,9 @@ shelve move [FILE_OR_DIRECTORY ...]
 shelve update
 ```
 
-Running `shelve` without arguments opens the folder menu. `open` chooses a configured folder and opens it in Finder. `move` finds PDFs,
-asks for a destination for each file, prints one batch preview, and moves only
+Running `shelve` without arguments shows help. `shelve open` chooses a configured folder and opens it in Finder. `move` lists candidate PDFs and first asks which files to move (for example
+`A1 A3`). Nothing is preselected, including when paths are passed explicitly.
+It then asks for a destination for each selected file, prints one batch preview, and moves only
 after confirmation. Existing files are never overwritten.
 
 Check the installed version with `shelve -V`. `shelve update` downloads the

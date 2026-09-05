@@ -248,9 +248,104 @@ pub(crate) fn choose(
     )
 }
 
+fn source_selection(
+    locations: &[Location],
+    input: &str,
+) -> Result<Vec<std::path::PathBuf>, String> {
+    let mut selected = Vec::new();
+    for code in input
+        .split(|c: char| c.is_whitespace() || c == ',')
+        .filter(|s| !s.is_empty())
+    {
+        let location = resolve(locations, code, false)?;
+        if !locations
+            .iter()
+            .any(|candidate| candidate.path == location.path)
+        {
+            return Err(format!("{code} is a folder; choose individual files"));
+        }
+        let path = std::path::PathBuf::from(location.path);
+        if !selected.contains(&path) {
+            selected.push(path);
+        }
+    }
+    if selected.is_empty() {
+        return Err("choose at least one file code, for example A1 A3".into());
+    }
+    Ok(selected)
+}
+
+pub(crate) fn choose_sources(
+    sources: &[std::path::PathBuf],
+) -> Result<Option<Vec<std::path::PathBuf>>, String> {
+    let locations: Vec<Location> = sources
+        .iter()
+        .map(|path| Location {
+            group: path
+                .parent()
+                .unwrap_or(Path::new("/"))
+                .to_string_lossy()
+                .into_owned(),
+            label: folder_name(path),
+            path: path.to_string_lossy().into_owned(),
+            move_here: false,
+        })
+        .collect();
+    let color = io::stderr().is_terminal()
+        && std::env::var_os("NO_COLOR").is_none()
+        && std::env::var("TERM").is_ok_and(|term| term != "dumb");
+    let mut out = io::stderr().lock();
+    render(&mut out, "Files to move", &locations, false, color).map_err(|e| e.to_string())?;
+    let mut input = io::stdin().lock();
+    loop {
+        write!(
+            out,
+            "  {} {} {}: ",
+            paint(color, "94", ">"),
+            paint(color, "1", "move which files"),
+            paint(color, "2", "<A1 A3 ...>")
+        )
+        .and_then(|_| out.flush())
+        .map_err(|e| e.to_string())?;
+        let mut line = String::new();
+        input.read_line(&mut line).map_err(|e| e.to_string())?;
+        let choice = line.trim();
+        if choice.is_empty() || choice.eq_ignore_ascii_case("q") || choice == "\u{1b}" {
+            return Ok(None);
+        }
+        match source_selection(&locations, choice) {
+            Ok(selected) => return Ok(Some(selected)),
+            Err(error) => writeln!(out, "\n  {error}\n").map_err(|e| e.to_string())?,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn source_selection_is_explicit_deduplicated_and_rejects_roots() {
+        let sources: Vec<Location> = ["one.pdf", "two.pdf", "three.pdf"]
+            .into_iter()
+            .map(|name| Location {
+                group: "Inbox".into(),
+                label: name.into(),
+                path: format!("/inbox/{name}"),
+                move_here: false,
+            })
+            .collect();
+        assert_eq!(
+            source_selection(&sources, "a3, A1 A3").unwrap(),
+            vec![
+                std::path::PathBuf::from("/inbox/three.pdf"),
+                std::path::PathBuf::from("/inbox/one.pdf")
+            ]
+        );
+        for input in ["", ",", "A0", "A1 Z9"] {
+            assert!(source_selection(&sources, input).is_err());
+        }
+    }
 
     fn locations() -> Vec<Location> {
         [
