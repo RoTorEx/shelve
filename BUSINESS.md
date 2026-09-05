@@ -32,7 +32,8 @@ Z as AA, AB, etc.; folder positions are one-based. Selectors are positions, not
 permanent IDs. Both open and move use the full config to assign codes, so PDF
 filtering never changes a destination's selector or allows an open-only folder.
 
-Group headers show the common base directory. Entries show relative paths when
-labels differ from filesystem names; `.` means the group directory itself.
-Without a common base, entries show their complete configured paths. Every
-destination can therefore be located from the menu without guessing its label.
+Group headers and folder names come from actual path components, never custom
+labels. Headers show the common root path. `<letter>0` opens that root without
+adding a numbered root entry; folders start at 1. Root shortcuts are open-only
+and cannot be used to bypass `move_here` restrictions. Relative path context is
+shown only when a folder is deeper than the group root.

@@ -37,11 +37,11 @@ fn group_label(mut index: usize) -> String {
     String::from_utf8(label).expect("ASCII group label")
 }
 
-pub(crate) fn resolve<'a>(
-    locations: &'a [Location],
+pub(crate) fn resolve(
+    locations: &[Location],
     input: &str,
     move_only: bool,
-) -> Result<&'a Location, String> {
+) -> Result<Location, String> {
     let choice = input.trim();
     let split = choice
         .find(|c: char| !c.is_ascii_alphabetic())
@@ -51,18 +51,37 @@ pub(crate) fn resolve<'a>(
     if label.is_empty() || number.is_empty() || !number.bytes().all(|b| b.is_ascii_digit()) {
         return Err("use a group letter and folder number, for example A1".into());
     }
-    let index = number.parse::<usize>().ok().and_then(|n| n.checked_sub(1));
+    let number = number
+        .parse::<usize>()
+        .map_err(|_| format!("invalid position: {number}"))?;
     let grouped = groups(locations);
-    let location = grouped
+    let group = grouped
         .iter()
         .enumerate()
         .find(|(i, _)| group_label(*i).eq_ignore_ascii_case(label))
-        .and_then(|(_, group)| index.and_then(|i| group.locations.get(i).copied()))
+        .map(|(_, group)| group)
+        .ok_or_else(|| format!("unknown destination: {choice}"))?;
+    if number == 0 {
+        if move_only {
+            return Err("group roots are for opening, not PDF moves".into());
+        }
+        let root = shared_parent(group).ok_or_else(|| "group has no common root".to_string())?;
+        return Ok(Location {
+            group: group.name.into(),
+            label: folder_name(root),
+            path: root.to_string_lossy().into_owned(),
+            move_here: false,
+        });
+    }
+    let location = group
+        .locations
+        .get(number - 1)
+        .copied()
         .ok_or_else(|| format!("unknown destination: {choice}"))?;
     if move_only && !location.move_here {
         return Err(format!("{choice} is not a PDF move destination"));
     }
-    Ok(location)
+    Ok(location.clone())
 }
 
 fn paint(color: bool, code: &str, text: &str) -> String {
@@ -71,6 +90,13 @@ fn paint(color: bool, code: &str, text: &str) -> String {
     } else {
         text.into()
     }
+}
+
+fn folder_name(path: &Path) -> String {
+    path.file_name()
+        .unwrap_or(path.as_os_str())
+        .to_string_lossy()
+        .into_owned()
 }
 
 fn shared_parent<'a>(group: &Group<'a>) -> Option<&'a Path> {
@@ -123,7 +149,11 @@ fn render(
             out,
             "\n  {}.  {}{}",
             paint(color, "33", &group_label(index)),
-            paint(color, "1", group.name),
+            paint(
+                color,
+                "1",
+                &parent.map(folder_name).unwrap_or_else(|| group.name.into())
+            ),
             paint(color, "90", &context)
         )?;
         for (index, location) in group.locations.iter().enumerate() {
@@ -134,7 +164,8 @@ fn render(
                         .unwrap_or(Path::new(&location.path)),
                     None => Path::new(&location.path),
                 };
-                let context = if parent.is_some() && path.to_string_lossy() == location.label {
+                let name = folder_name(Path::new(&location.path));
+                let context = if parent.is_some() && path.to_string_lossy() == name {
                     String::new()
                 } else {
                     format!(
@@ -150,7 +181,7 @@ fn render(
                     out,
                     "     {} {}{}",
                     paint(color, "36", &format!("{:>2})", index + 1)),
-                    paint(color, "32", &location.label),
+                    paint(color, "32", &name),
                     paint(color, "90", &context)
                 )?;
             }
@@ -158,7 +189,7 @@ fn render(
     }
     writeln!(
         out,
-        "\n  Type a code such as A1, then Enter. Empty input or q cancels.\n"
+        "\n  Type a code such as A1, then Enter. A0 opens the group root. Empty input or q cancels.\n"
     )
 }
 
@@ -181,7 +212,7 @@ fn prompt(
             return Ok(None);
         }
         match resolve(locations, choice, move_only) {
-            Ok(location) => return Ok(Some(location.clone())),
+            Ok(location) => return Ok(Some(location)),
             Err(error) => writeln!(out, "\n  {error}\n").map_err(|e| e.to_string())?,
         }
     }
@@ -233,7 +264,6 @@ mod tests {
             "",
             "A",
             "1",
-            "A0",
             "A3",
             "Z1",
             "A-1",
@@ -253,9 +283,35 @@ mod tests {
         let mut out = Vec::new();
         render(&mut out, "Move PDF", &locations, true, false).unwrap();
         let text = String::from_utf8(out).unwrap();
-        assert!(text.contains("\n\n  B.  Business (/)\n      2) Invoices"));
+        assert!(text.contains("\n\n  B.  / (/)\n      2) Invoices"));
         assert!(!text.contains("Desktop"));
         assert!(!text.contains("\x1b["));
+    }
+
+    #[test]
+    fn zero_opens_the_group_root_and_names_come_from_paths() {
+        let locations = vec![Location {
+            group: "Custom group".into(),
+            label: "Custom alias".into(),
+            path: "~/Documents/Business/In Invoices".into(),
+            move_here: true,
+        }];
+        assert_eq!(
+            resolve(&locations, "a0", false).unwrap().path,
+            "~/Documents/Business"
+        );
+        assert_eq!(
+            resolve(&locations, "A1", false).unwrap().path,
+            locations[0].path
+        );
+        assert!(resolve(&locations, "A0", true).is_err());
+        let mut out = Vec::new();
+        render(&mut out, "Open folder", &locations, false, false).unwrap();
+        let text = String::from_utf8(out).unwrap();
+        assert!(text.contains("A.  Business (~/Documents/Business/)"));
+        assert!(text.contains("1) In Invoices"));
+        assert!(!text.contains("Custom"));
+        assert!(!text.lines().any(|line| line.trim_start().starts_with("0)")));
     }
 
     #[test]

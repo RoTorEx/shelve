@@ -116,7 +116,7 @@ fn load_config() -> Result<Config, String> {
 
 fn open_location(config: Config, selector: Option<&str>) -> Result<(), String> {
     let location = if let Some(selector) = selector {
-        Some(picker::resolve(&config.locations, selector, false)?.clone())
+        Some(picker::resolve(&config.locations, selector, false)?)
     } else {
         picker::choose("Open folder", &config.locations, false)?
     };
