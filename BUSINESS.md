@@ -31,8 +31,8 @@ numbered folders, visible spacing, and typed selectors such as `A1` followed by
 Enter. `shelve open A1` opens a known folder without the menu. Blank input, EOF,
 or `q` cancels; invalid selectors report an error without selecting a fallback.
 
-Sections follow config order, and items follow their explicit order within each
-section. Duplicate item paths are shown once. Shelve performs no automatic
+Sections follow config order, and items are sorted by full resolved path within
+each section. Duplicate item paths are shown once. Shelve performs no automatic
 folder discovery: the config is the exact visible navigation surface, including
 items at any depth. Letters continue after Z as AA, AB, etc.; folder positions
 are one-based. Selectors are positions, not permanent IDs. Open and move use the

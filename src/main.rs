@@ -177,6 +177,7 @@ fn materialize_section(section: Section) -> Result<Vec<Location>, String> {
             paths.push(path);
         }
     }
+    paths.sort();
 
     let group = root.to_string_lossy().into_owned();
     let mut locations = vec![Location {
@@ -470,7 +471,7 @@ mod tests {
         assert_eq!(parsed.sections[0].root, "~");
         assert_eq!(
             parsed.sections[0].items,
-            ["Desktop", "Downloads", "Documents"]
+            ["Desktop", "Documents", "Downloads"]
         );
     }
 
@@ -514,7 +515,7 @@ items = ["Documents/Archive"]
     }
 
     #[test]
-    fn section_uses_only_explicit_items_at_any_depth_and_preserves_order() {
+    fn section_uses_only_explicit_items_at_any_depth_and_sorts_full_paths() {
         let temp = tempfile::tempdir().unwrap();
         let root = temp.path().join("Library");
         let books = root.join("Books");
@@ -538,7 +539,7 @@ items = ["Documents/Archive"]
             .filter(|location| !location.is_section_root)
             .map(|location| PathBuf::from(&location.path))
             .collect::<Vec<_>>();
-        assert_eq!(paths, vec![english, books]);
+        assert_eq!(paths, vec![books, english]);
         assert_eq!(locations[0].root.as_deref(), root.to_str());
         assert!(locations[0].is_section_root);
     }

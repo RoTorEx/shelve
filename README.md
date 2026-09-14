@@ -67,8 +67,8 @@ items = [
 
 `<sector>0` always opens the configured `root`. Every section requires `items`;
 an empty list exposes only the root. Items are resolved relative to the root,
-may name descendants at any depth, appear strictly in config order, and are
-deduplicated. Absolute and home-relative items are accepted only when they
+may name descendants at any depth, are deduplicated, and appear sorted by their
+full resolved paths. Absolute and home-relative items are accepted only when they
 still resolve below the root, so an umbrella cannot contain unrelated folders.
 Nothing is discovered or added automatically. Every displayed item is
 available to both `open` and `move`.

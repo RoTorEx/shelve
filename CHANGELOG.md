@@ -4,6 +4,10 @@ Tracks real product and release progress.
 
 ## [Unreleased]
 
+### Changed
+
+- Sort every section's explicit items by full resolved path before display.
+
 ## [0.1.2] - 2026-09-14
 
 ### Added

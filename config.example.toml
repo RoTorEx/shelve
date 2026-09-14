@@ -3,7 +3,7 @@ version = 2
 inboxes = ["~/Desktop", "~/Downloads"]
 
 # A section has a stable root, opened with `<sector>0`. Every visible folder is
-# an explicit relative item below that root, in menu order.
+# an explicit relative item below that root; items are sorted by full path.
 [[sections]]
 root = "~"
-items = ["Desktop", "Downloads", "Documents"]
+items = ["Desktop", "Documents", "Downloads"]
