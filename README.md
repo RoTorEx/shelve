@@ -61,17 +61,16 @@ children = true
 pins = [
   "Books",
   "Guides/English",
-  "~/Documents/Storage",
 ]
 ```
 
 `<sector>0` always opens the configured `root`. Relative pins are resolved from
-that root, while pins beginning with `~` or `/` may live elsewhere but remain
-in the same section. Pins appear first in config order. `children = true`
-appends the root's other immediate, non-hidden directories alphabetically;
-Shelve does not recursively flood the menu. Duplicate paths are shown once.
-Omit both `pins` and `children` when a section should expose only its root via
-`<sector>0`.
+that root. Absolute and home-relative pins are accepted only when they still
+resolve below the root; an umbrella cannot contain unrelated folders. Pins
+appear first in config order. `children = true` appends the root's other
+immediate, non-hidden directories alphabetically; Shelve does not recursively
+flood the menu. Duplicate paths are shown once. Omit both `pins` and `children`
+when a section should expose only its root via `<sector>0`.
 
 Use `move_here` as an explicit allowlist. Every listed path must also be a pin
 or an automatically discovered child:
@@ -105,7 +104,7 @@ labels. Headers show the explicit root name followed by its parent path,
 matching Hop. `<letter>0` opens that root without adding a numbered root entry;
 folders start at 1. Root shortcuts are open-only and cannot be used to bypass
 `move_here` restrictions. A deeper pin shows its parent relative to the root;
-a pin outside the root shows its home-relative or absolute parent.
+every pin remains under its section root.
 
 The menu follows Hop’s spacing and color roles, with a dim version and dividers,
 a parent path in each sector heading, and a single short input prompt. Usage

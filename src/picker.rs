@@ -476,24 +476,14 @@ mod tests {
 
     #[test]
     fn explicit_section_root_is_stable_and_deep_context_shows_the_parent() {
-        let locations = vec![
-            Location {
-                group: "/workspace/Library".into(),
-                label: "English".into(),
-                path: "/workspace/Library/Guides/English".into(),
-                move_here: false,
-                root: Some("/workspace/Library".into()),
-                is_section_root: false,
-            },
-            Location {
-                group: "/workspace/Library".into(),
-                label: "Storage".into(),
-                path: "/archive/Storage".into(),
-                move_here: false,
-                root: Some("/workspace/Library".into()),
-                is_section_root: false,
-            },
-        ];
+        let locations = vec![Location {
+            group: "/workspace/Library".into(),
+            label: "English".into(),
+            path: "/workspace/Library/Guides/English".into(),
+            move_here: false,
+            root: Some("/workspace/Library".into()),
+            is_section_root: false,
+        }];
 
         assert_eq!(
             resolve(&locations, "A0", false).unwrap().path,
@@ -504,7 +494,6 @@ mod tests {
         let text = String::from_utf8(out).unwrap();
         assert!(text.contains("A.  Library (/workspace/)"));
         assert!(text.contains("1) English (Guides/)"));
-        assert!(text.contains("2) Storage (/archive/)"));
     }
 
     #[test]

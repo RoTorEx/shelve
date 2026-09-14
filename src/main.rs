@@ -270,20 +270,29 @@ fn materialize_section(section: Section) -> Result<Vec<Location>, String> {
 
 fn resolve_section_path(root: &Path, configured: &str) -> Result<PathBuf, String> {
     let path = Path::new(configured);
-    if path.is_absolute() || configured == "~" || configured.starts_with("~/") {
-        return expand_home(configured);
-    }
-    if path.components().any(|component| {
-        matches!(
-            component,
-            Component::ParentDir | Component::RootDir | Component::Prefix(_)
-        )
-    }) {
+    let resolved = if path.is_absolute() || configured == "~" || configured.starts_with("~/") {
+        expand_home(configured)?
+    } else {
+        if path.components().any(|component| {
+            matches!(
+                component,
+                Component::ParentDir | Component::RootDir | Component::Prefix(_)
+            )
+        }) {
+            return Err(format!(
+                "relative section path must stay below its root: {configured}"
+            ));
+        }
+        root.join(path)
+    };
+    if !resolved.starts_with(root) {
         return Err(format!(
-            "relative section path must stay below its root: {configured}"
+            "section path is outside its root {}: {}",
+            root.display(),
+            resolved.display()
         ));
     }
-    Ok(root.join(path))
+    Ok(resolved)
 }
 
 fn open_location(config: Config, selector: Option<&str>) -> Result<(), String> {
@@ -575,24 +584,19 @@ pins = ["Documents"]
     }
 
     #[test]
-    fn section_combines_pins_at_any_depth_external_paths_and_direct_children() {
+    fn section_combines_pins_at_any_depth_and_direct_children() {
         let temp = tempfile::tempdir().unwrap();
         let root = temp.path().join("Library");
         let books = root.join("Books");
         let guides = root.join("Guides");
         let english = guides.join("English");
-        let external = temp.path().join("Storage");
-        for path in [&books, &english, &external, &root.join(".hidden")] {
+        for path in [&books, &english, &root.join(".hidden")] {
             fs::create_dir_all(path).unwrap();
         }
         let section = Section {
             root: root.to_string_lossy().into_owned(),
             children: true,
-            pins: vec![
-                "Books".into(),
-                "Guides/English".into(),
-                external.to_string_lossy().into_owned(),
-            ],
+            pins: vec!["Books".into(), "Guides/English".into()],
             move_here: vec!["Books".into()],
         };
 
@@ -602,10 +606,29 @@ pins = ["Documents"]
             .filter(|location| !location.is_section_root)
             .map(|location| PathBuf::from(&location.path))
             .collect::<Vec<_>>();
-        assert_eq!(paths, vec![books, english, external, guides]);
+        assert_eq!(paths, vec![books, english, guides]);
         assert!(locations[1].move_here);
         assert_eq!(locations[0].root.as_deref(), root.to_str());
         assert!(locations[0].is_section_root);
+    }
+
+    #[test]
+    fn section_rejects_a_pin_outside_its_root() {
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path().join("Library");
+        let outside = temp.path().join("Storage");
+        fs::create_dir_all(&root).unwrap();
+        fs::create_dir_all(&outside).unwrap();
+        let section = Section {
+            root: root.to_string_lossy().into_owned(),
+            children: false,
+            pins: vec![outside.to_string_lossy().into_owned()],
+            move_here: Vec::new(),
+        };
+
+        let error = materialize_section(section).err().unwrap();
+        assert!(error.contains("section path is outside its root"));
+        assert!(error.contains(&outside.to_string_lossy().into_owned()));
     }
 
     #[test]

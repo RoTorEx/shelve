@@ -17,10 +17,11 @@ Open locations are entirely config-driven. Shelve has no built-in
 domain-specific or root-folder assumption. Config version 2 defines sections
 with explicit roots, optional pinned locations, automatic immediate children,
 and explicit PDF-move allowlists. Relative pins belong to the section root;
-home-relative and absolute pins may group a location from elsewhere under that
-section. A section with no pins or discovered children remains available
-through its root selector. Legacy flat `[[locations]]` configs remain readable.
-The bundled starter config contains only standard macOS locations; personal
+home-relative and absolute pins are valid only when they still resolve below
+that root. A section is a filesystem umbrella and cannot contain unrelated
+folders. A section with no pins or discovered children remains available through
+its root selector. Legacy flat `[[locations]]` configs remain readable. The
+bundled starter config contains only standard macOS locations; personal
 destinations belong only in the user's config.
 
 The `open` and `move` flows remain local. Network access is limited to the
@@ -48,7 +49,7 @@ their inferred-root behavior. Headers show the root name followed by its parent
 path, matching Hop. `<letter>0` opens that root without adding a numbered root
 entry; folders start at 1. Root shortcuts are open-only and cannot be used to
 bypass `move_here` restrictions. Deeper pins show their parent relative to the
-section root; outside pins show their home-relative or absolute parent.
+section root.
 
 The menu follows Hop’s spacing and color roles, with a dim version and dividers,
 a parent path in each sector heading, and a single short input prompt. Usage
