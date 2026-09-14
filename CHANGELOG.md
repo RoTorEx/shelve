@@ -4,6 +4,8 @@ Tracks real product and release progress.
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-09-14
+
 ### Added
 
 - Added config version 2 sections with explicit roots, required ordered items at any descendant depth, and path deduplication.
