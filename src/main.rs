@@ -43,8 +43,7 @@ struct Location {
 #[derive(Deserialize)]
 struct Section {
     root: String,
-    #[serde(default)]
-    promote: Vec<String>,
+    items: Vec<String>,
 }
 
 impl std::fmt::Display for Location {
@@ -167,44 +166,12 @@ fn materialize_section(section: Section) -> Result<Vec<Location>, String> {
         return Err(format!("section root is not a folder: {}", root.display()));
     }
 
-    let entries = fs::read_dir(&root)
-        .map_err(|error| format!("cannot read section root {}: {error}", root.display()))?;
     let mut paths = Vec::new();
-    for entry in entries {
-        let entry = entry
-            .map_err(|error| format!("cannot read section root {}: {error}", root.display()))?;
-        if entry.file_name().to_string_lossy().starts_with('.') {
-            continue;
-        }
-        let kind = entry.file_type().map_err(|error| {
-            format!(
-                "cannot inspect section child {}: {error}",
-                entry.path().display()
-            )
-        })?;
-        if kind.is_dir() {
-            paths.push(entry.path());
-        }
-    }
-    paths.sort_by(|left, right| {
-        left.file_name()
-            .unwrap_or_default()
-            .to_string_lossy()
-            .to_lowercase()
-            .cmp(
-                &right
-                    .file_name()
-                    .unwrap_or_default()
-                    .to_string_lossy()
-                    .to_lowercase(),
-            )
-            .then_with(|| left.cmp(right))
-    });
-    let mut seen = paths.iter().cloned().collect::<HashSet<_>>();
-    for promoted in &section.promote {
-        let path = resolve_section_path(&root, promoted)?;
+    let mut seen = HashSet::new();
+    for item in &section.items {
+        let path = resolve_section_path(&root, item)?;
         if !path.is_dir() {
-            return Err(format!("promoted path is not a folder: {}", path.display()));
+            return Err(format!("section item is not a folder: {}", path.display()));
         }
         if path != root && seen.insert(path.clone()) {
             paths.push(path);
@@ -500,7 +467,11 @@ mod tests {
         let parsed: ConfigFile = toml::from_str(include_str!("../config.example.toml")).unwrap();
         assert_eq!(parsed.version, 2);
         assert_eq!(parsed.sections.len(), 1);
-        assert_eq!(parsed.sections[0].root, "~/Documents");
+        assert_eq!(parsed.sections[0].root, "~");
+        assert_eq!(
+            parsed.sections[0].items,
+            ["Desktop", "Downloads", "Documents"]
+        );
     }
 
     #[test]
@@ -531,7 +502,7 @@ move_here = true
             r#"
 [[sections]]
 root = "~"
-promote = ["Documents/Archive"]
+items = ["Documents/Archive"]
 "#,
         )
         .unwrap();
@@ -543,7 +514,7 @@ promote = ["Documents/Archive"]
     }
 
     #[test]
-    fn section_combines_direct_children_and_promoted_descendants() {
+    fn section_uses_only_explicit_items_at_any_depth_and_preserves_order() {
         let temp = tempfile::tempdir().unwrap();
         let root = temp.path().join("Library");
         let books = root.join("Books");
@@ -554,7 +525,11 @@ promote = ["Documents/Archive"]
         }
         let section = Section {
             root: root.to_string_lossy().into_owned(),
-            promote: vec!["Guides/English".into()],
+            items: vec![
+                "Guides/English".into(),
+                "Books".into(),
+                "Guides/English".into(),
+            ],
         };
 
         let locations = materialize_section(section).unwrap();
@@ -563,13 +538,13 @@ promote = ["Documents/Archive"]
             .filter(|location| !location.is_section_root)
             .map(|location| PathBuf::from(&location.path))
             .collect::<Vec<_>>();
-        assert_eq!(paths, vec![books, guides, english]);
+        assert_eq!(paths, vec![english, books]);
         assert_eq!(locations[0].root.as_deref(), root.to_str());
         assert!(locations[0].is_section_root);
     }
 
     #[test]
-    fn section_rejects_a_promoted_path_outside_its_root() {
+    fn section_rejects_an_item_outside_its_root() {
         let temp = tempfile::tempdir().unwrap();
         let root = temp.path().join("Library");
         let outside = temp.path().join("Storage");
@@ -577,7 +552,7 @@ promote = ["Documents/Archive"]
         fs::create_dir_all(&outside).unwrap();
         let section = Section {
             root: root.to_string_lossy().into_owned(),
-            promote: vec![outside.to_string_lossy().into_owned()],
+            items: vec![outside.to_string_lossy().into_owned()],
         };
 
         let error = materialize_section(section).err().unwrap();
@@ -586,30 +561,30 @@ promote = ["Documents/Archive"]
     }
 
     #[test]
-    fn section_rejects_a_promoted_path_that_is_not_a_folder() {
+    fn section_rejects_an_item_that_is_not_a_folder() {
         let temp = tempfile::tempdir().unwrap();
         let file = temp.path().join("note.txt");
         fs::write(&file, "note").unwrap();
         let section = Section {
             root: temp.path().to_string_lossy().into_owned(),
-            promote: vec!["note.txt".into()],
+            items: vec!["note.txt".into()],
         };
 
         assert!(
             materialize_section(section)
                 .err()
                 .unwrap()
-                .contains("promoted path is not a folder")
+                .contains("section item is not a folder")
         );
     }
 
     #[test]
-    fn section_root_is_available_without_children_or_promotions() {
+    fn section_root_is_available_with_an_empty_item_list() {
         let temp = tempfile::tempdir().unwrap();
         let root = temp.path().to_string_lossy().into_owned();
         let section = Section {
             root: root.clone(),
-            promote: Vec::new(),
+            items: Vec::new(),
         };
 
         let locations = materialize_section(section).unwrap();

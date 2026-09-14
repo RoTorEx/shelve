@@ -57,17 +57,20 @@ inboxes = ["~/Desktop", "~/Downloads"]
 
 [[sections]]
 root = "~/Documents/WorkSpace/Library"
-promote = [
+items = [
+  "Books",
+  "Guides",
+  "Images",
   "Guides/English",
 ]
 ```
 
-`<sector>0` always opens the configured `root`. Shelve automatically lists its
-immediate, non-hidden child directories alphabetically. A `promote` entry lifts
-an important deeper descendant into the same flat list; relative paths are
-resolved from the root. Absolute and home-relative promoted paths are accepted
-only when they still resolve below the root, so an umbrella cannot contain
-unrelated folders. Duplicate paths are shown once. Every displayed folder is
+`<sector>0` always opens the configured `root`. Every section requires `items`;
+an empty list exposes only the root. Items are resolved relative to the root,
+may name descendants at any depth, appear strictly in config order, and are
+deduplicated. Absolute and home-relative items are accepted only when they
+still resolve below the root, so an umbrella cannot contain unrelated folders.
+Nothing is discovered or added automatically. Every displayed item is
 available to both `open` and `move`.
 
 Legacy `[[locations]]` configs remain readable, but `move_here` is no longer
@@ -90,8 +93,8 @@ Section headers and folder names come from actual path components, never custom
 labels. Headers show the explicit root name followed by its parent path,
 matching Hop. `<letter>0` opens that root without adding a numbered root entry;
 folders start at 1. Root shortcuts are open-only and cannot be used to bypass
-the numbered folder list. A promoted descendant shows its parent relative to
-the root; every promoted path remains under its section root.
+the numbered folder list. A deeper item shows its parent relative to the root;
+every item remains under its section root.
 
 The menu follows Hop’s spacing and color roles, with a dim version and dividers,
 a parent path in each sector heading, and a single short input prompt. Usage

@@ -2,8 +2,8 @@
 version = 2
 inboxes = ["~/Desktop", "~/Downloads"]
 
-# A section has a stable root, opened with `<sector>0`. Its immediate,
-# non-hidden child directories are listed automatically. Use `promote` only to
-# surface an important deeper descendant in the same flat list.
+# A section has a stable root, opened with `<sector>0`. Every visible folder is
+# an explicit relative item below that root, in menu order.
 [[sections]]
-root = "~/Documents"
+root = "~"
+items = ["Desktop", "Downloads", "Documents"]

@@ -15,14 +15,13 @@ framework.
 
 Open locations are entirely config-driven. Shelve has no built-in
 domain-specific or root-folder assumption. Config version 2 defines sections
-with explicit roots, automatic immediate children, and optional promoted
-descendants. Relative promoted paths belong to the section root; home-relative
-and absolute promoted paths are valid only when they still resolve below that
-root. A section is a filesystem umbrella and cannot contain unrelated folders.
-A section with no discovered or promoted folders remains available through its
-root selector. Legacy flat `[[locations]]` configs remain readable. The bundled
-starter config contains only a standard macOS location; personal destinations
-belong only in the user's config.
+with explicit roots and required item lists. Relative items belong to the
+section root; home-relative and absolute items are valid only when they still
+resolve below that root. A section is a filesystem umbrella and cannot contain
+unrelated folders. An empty item list exposes only the root selector. Legacy
+flat `[[locations]]` configs remain readable. The bundled starter config
+contains only standard macOS locations; personal destinations belong only in
+the user's config.
 
 The `open` and `move` flows remain local. Network access is limited to the
 explicit `update` command and installation from GitHub Releases.
@@ -32,12 +31,11 @@ numbered folders, visible spacing, and typed selectors such as `A1` followed by
 Enter. `shelve open A1` opens a known folder without the menu. Blank input, EOF,
 or `q` cancels; invalid selectors report an error without selecting a fallback.
 
-Sections follow config order. Immediate non-hidden child directories follow
-case-insensitive alphabetical order, then promoted descendants follow config
-order. Discovered and promoted paths are deduplicated. Automatic discovery is
-deliberately shallow; important deeper folders are explicitly promoted into the
-same flat list. Letters continue after Z as AA, AB, etc.; folder positions are
-one-based. Selectors are positions, not permanent IDs. Open and move use the
+Sections follow config order, and items follow their explicit order within each
+section. Duplicate item paths are shown once. Shelve performs no automatic
+folder discovery: the config is the exact visible navigation surface, including
+items at any depth. Letters continue after Z as AA, AB, etc.; folder positions
+are one-based. Selectors are positions, not permanent IDs. Open and move use the
 same materialized folders and codes without per-folder eligibility flags.
 
 Section headers and folder names come from actual path components, never custom
@@ -46,8 +44,8 @@ common ancestor from the number or placement of entries. Legacy groups retain
 their inferred-root behavior. Headers show the root name followed by its parent
 path, matching Hop. `<letter>0` opens that root without adding a numbered root
 entry; folders start at 1. Root shortcuts are open-only and cannot be used to
-select a move destination. Promoted descendants show their parent relative to
-the section root.
+select a move destination. Deeper items show their parent relative to the
+section root.
 
 The menu follows Hop’s spacing and color roles, with a dim version and dividers,
 a parent path in each sector heading, and a single short input prompt. Usage

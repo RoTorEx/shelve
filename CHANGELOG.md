@@ -6,12 +6,12 @@ Tracks real product and release progress.
 
 ### Added
 
-- Added config version 2 sections with explicit roots, automatic immediate-child discovery, optional promotion of deeper descendants, and path deduplication.
+- Added config version 2 sections with explicit roots, required ordered items at any descendant depth, and path deduplication.
 
 ### Changed
 
 - Made `<sector>0` stable for version 2 sections instead of inferring the root from their current entries, while preserving legacy `[[locations]]` configs.
-- Use the same visible folder list for open and move without `move_here`, reject promoted paths outside their configured root, show parent context for promoted descendants, and fix expansion of the exact `~` home path.
+- Use the same explicit folder list for open and move without `move_here`, reject items outside their configured root, show parent context for deep items, and fix expansion of the exact `~` home path.
 
 ## [0.1.1] - 2026-09-05
 
