@@ -78,7 +78,6 @@ pub(crate) fn resolve(
             group: group.name.into(),
             label: folder_name(root),
             path: root.to_string_lossy().into_owned(),
-            move_here: false,
             root: group.root.map(str::to_owned),
             is_section_root: group.root.is_some(),
         });
@@ -88,9 +87,6 @@ pub(crate) fn resolve(
         .get(number - 1)
         .copied()
         .ok_or_else(|| format!("unknown destination: {choice}"))?;
-    if move_only && !location.move_here {
-        return Err(format!("{choice} is not a PDF move destination"));
-    }
     Ok(location.clone())
 }
 
@@ -208,7 +204,7 @@ fn render(
         writeln!(out, "\n  {} {}", paint(color, "1", "File:"), file)?;
     }
     for (index, group) in groups(locations).iter().enumerate() {
-        if move_only && !group.locations.iter().any(|location| location.move_here) {
+        if move_only && group.locations.is_empty() {
             continue;
         }
         let parent = shared_parent(group);
@@ -235,18 +231,16 @@ fn render(
             paint(color, "90", &context)
         )?;
         for (index, location) in group.locations.iter().enumerate() {
-            if !move_only || location.move_here {
-                let path = Path::new(&location.path);
-                let name = folder_name(path);
-                let context = location_context(path, parent);
-                writeln!(
-                    out,
-                    "     {} {}{}",
-                    paint(color, "36", &format!("{:>2})", index + 1)),
-                    paint(color, "32", &name),
-                    paint(color, "90", &context)
-                )?;
-            }
+            let path = Path::new(&location.path);
+            let name = folder_name(path);
+            let context = location_context(path, parent);
+            writeln!(
+                out,
+                "     {} {}{}",
+                paint(color, "36", &format!("{:>2})", index + 1)),
+                paint(color, "32", &name),
+                paint(color, "90", &context)
+            )?;
         }
     }
     writeln!(out)
@@ -336,7 +330,6 @@ pub(crate) fn choose_sources(
                 .into_owned(),
             label: folder_name(path),
             path: path.to_string_lossy().into_owned(),
-            move_here: false,
             root: None,
             is_section_root: false,
         })
@@ -374,7 +367,6 @@ mod tests {
                 group: "Inbox".into(),
                 label: name.into(),
                 path: format!("/inbox/{name}"),
-                move_here: false,
                 root: None,
                 is_section_root: false,
             })
@@ -393,17 +385,16 @@ mod tests {
 
     fn locations() -> Vec<Location> {
         [
-            ("Home", "Desktop", false),
-            ("Business", "Root", false),
-            ("Business", "Invoices", true),
-            ("Home", "Downloads", false),
+            ("Home", "Desktop"),
+            ("Business", "Root"),
+            ("Business", "Invoices"),
+            ("Home", "Downloads"),
         ]
         .into_iter()
-        .map(|(group, label, move_here)| Location {
+        .map(|(group, label)| Location {
             group: group.into(),
             label: label.into(),
             path: format!("/{label}"),
-            move_here,
             root: None,
             is_section_root: false,
         })
@@ -434,15 +425,15 @@ mod tests {
     }
 
     #[test]
-    fn move_menu_preserves_codes_and_rejects_open_only_destinations() {
+    fn move_menu_uses_the_same_folders_and_codes_as_open() {
         let locations = locations();
         assert_eq!(resolve(&locations, "B2", true).unwrap().label, "Invoices");
-        assert!(resolve(&locations, "B1", true).is_err());
+        assert_eq!(resolve(&locations, "B1", true).unwrap().label, "Root");
         let mut out = Vec::new();
         render(&mut out, "Move PDF", &locations, true, false).unwrap();
         let text = String::from_utf8(out).unwrap();
-        assert!(text.contains("\n\n  B.  / (/)\n      2) Invoices"));
-        assert!(!text.contains("Desktop"));
+        assert!(text.contains("\n\n  B.  / (/)\n      1) Root\n      2) Invoices"));
+        assert!(text.contains("Desktop"));
         assert!(!text.contains("\x1b["));
     }
 
@@ -452,7 +443,6 @@ mod tests {
             group: "Custom group".into(),
             label: "Custom alias".into(),
             path: "~/Documents/Business/In Invoices".into(),
-            move_here: true,
             root: None,
             is_section_root: false,
         }];
@@ -480,7 +470,6 @@ mod tests {
             group: "/workspace/Library".into(),
             label: "English".into(),
             path: "/workspace/Library/Guides/English".into(),
-            move_here: false,
             root: Some("/workspace/Library".into()),
             is_section_root: false,
         }];
@@ -506,7 +495,6 @@ mod tests {
                 group: format!("Group {i}"),
                 label: "Folder".into(),
                 path: "/folder".into(),
-                move_here: false,
                 root: None,
                 is_section_root: false,
             });

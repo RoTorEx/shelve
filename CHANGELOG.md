@@ -6,12 +6,12 @@ Tracks real product and release progress.
 
 ### Added
 
-- Added config version 2 sections with explicit roots, ordered descendant pins at any depth, optional immediate-child discovery, path deduplication, and explicit PDF-move allowlists.
+- Added config version 2 sections with explicit roots, automatic immediate-child discovery, optional promotion of deeper descendants, and path deduplication.
 
 ### Changed
 
 - Made `<sector>0` stable for version 2 sections instead of inferring the root from their current entries, while preserving legacy `[[locations]]` configs.
-- Reject section paths outside their configured root, show parent context for deep pins, and fix expansion of the exact `~` home path.
+- Use the same visible folder list for open and move without `move_here`, reject promoted paths outside their configured root, show parent context for promoted descendants, and fix expansion of the exact `~` home path.
 
 ## [0.1.1] - 2026-09-05
 

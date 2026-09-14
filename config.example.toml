@@ -2,10 +2,8 @@
 version = 2
 inboxes = ["~/Desktop", "~/Downloads"]
 
-# A section has a stable root, opened with `<sector>0`. Pins are resolved
-# relative to that root and keep their configured order. Set children = true to
-# append the root's other immediate, non-hidden directories alphabetically.
+# A section has a stable root, opened with `<sector>0`. Its immediate,
+# non-hidden child directories are listed automatically. Use `promote` only to
+# surface an important deeper descendant in the same flat list.
 [[sections]]
-root = "~"
-pins = ["Desktop", "Downloads", "Documents"]
-move_here = ["Documents"]
+root = "~/Documents"

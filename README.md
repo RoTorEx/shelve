@@ -23,11 +23,11 @@ Type `B2` and press Enter to choose a folder. Codes are case-insensitive.
 Empty input or `q` followed by Enter cancels. The menu stays in terminal
 scrollback, so you can scroll to review all groups.
 
-Use `shelve open B2` to open a known destination directly. Codes follow config
-order and remain the same in `open` and `move`; PDF selection shows only folders
-with `move_here = true`. Editing config order can change codes. Color follows
-Hop's group/number/folder hierarchy and is disabled for redirected output,
-`NO_COLOR`, or a dumb terminal.
+Use `shelve open B2` to open a known destination directly. Codes follow section
+and folder order and remain the same in `open` and `move`; every displayed
+folder is available to both commands. Editing the config or folder tree can
+change codes. Color follows Hop's group/number/folder hierarchy and is disabled
+for redirected output, `NO_COLOR`, or a dumb terminal.
 
 ## Install from GitHub
 
@@ -57,34 +57,21 @@ inboxes = ["~/Desktop", "~/Downloads"]
 
 [[sections]]
 root = "~/Documents/WorkSpace/Library"
-children = true
-pins = [
-  "Books",
+promote = [
   "Guides/English",
 ]
 ```
 
-`<sector>0` always opens the configured `root`. Relative pins are resolved from
-that root. Absolute and home-relative pins are accepted only when they still
-resolve below the root; an umbrella cannot contain unrelated folders. Pins
-appear first in config order. `children = true` appends the root's other
-immediate, non-hidden directories alphabetically; Shelve does not recursively
-flood the menu. Duplicate paths are shown once. Omit both `pins` and `children`
-when a section should expose only its root via `<sector>0`.
+`<sector>0` always opens the configured `root`. Shelve automatically lists its
+immediate, non-hidden child directories alphabetically. A `promote` entry lifts
+an important deeper descendant into the same flat list; relative paths are
+resolved from the root. Absolute and home-relative promoted paths are accepted
+only when they still resolve below the root, so an umbrella cannot contain
+unrelated folders. Duplicate paths are shown once. Every displayed folder is
+available to both `open` and `move`.
 
-Use `move_here` as an explicit allowlist. Every listed path must also be a pin
-or an automatically discovered child:
-
-```toml
-[[sections]]
-root = "~/Documents/WorkSpace/Business/PL JDG"
-children = true
-pins = ["In Invoices", "Out Invoices"]
-move_here = ["In Invoices", "Out Invoices"]
-```
-
-Legacy `[[locations]]` configs remain supported. In that format,
-`move_here = true` on an individual location retains its existing meaning.
+Legacy `[[locations]]` configs remain readable, but `move_here` is no longer
+needed or used.
 
 The build output lives under `~/construction_side/shelve/target`.
 
@@ -103,8 +90,8 @@ Section headers and folder names come from actual path components, never custom
 labels. Headers show the explicit root name followed by its parent path,
 matching Hop. `<letter>0` opens that root without adding a numbered root entry;
 folders start at 1. Root shortcuts are open-only and cannot be used to bypass
-`move_here` restrictions. A deeper pin shows its parent relative to the root;
-every pin remains under its section root.
+the numbered folder list. A promoted descendant shows its parent relative to
+the root; every promoted path remains under its section root.
 
 The menu follows Hop’s spacing and color roles, with a dim version and dividers,
 a parent path in each sector heading, and a single short input prompt. Usage

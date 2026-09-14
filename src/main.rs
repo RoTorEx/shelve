@@ -34,8 +34,6 @@ struct Location {
     group: String,
     label: String,
     path: String,
-    #[serde(default)]
-    move_here: bool,
     #[serde(skip)]
     root: Option<String>,
     #[serde(skip)]
@@ -46,11 +44,7 @@ struct Location {
 struct Section {
     root: String,
     #[serde(default)]
-    children: bool,
-    #[serde(default)]
-    pins: Vec<String>,
-    #[serde(default)]
-    move_here: Vec<String>,
+    promote: Vec<String>,
 }
 
 impl std::fmt::Display for Location {
@@ -173,69 +167,48 @@ fn materialize_section(section: Section) -> Result<Vec<Location>, String> {
         return Err(format!("section root is not a folder: {}", root.display()));
     }
 
+    let entries = fs::read_dir(&root)
+        .map_err(|error| format!("cannot read section root {}: {error}", root.display()))?;
     let mut paths = Vec::new();
-    let mut seen = HashSet::new();
-    for pin in &section.pins {
-        let path = resolve_section_path(&root, pin)?;
-        if path == root {
+    for entry in entries {
+        let entry = entry
+            .map_err(|error| format!("cannot read section root {}: {error}", root.display()))?;
+        if entry.file_name().to_string_lossy().starts_with('.') {
             continue;
         }
-        if seen.insert(path.clone()) {
+        let kind = entry.file_type().map_err(|error| {
+            format!(
+                "cannot inspect section child {}: {error}",
+                entry.path().display()
+            )
+        })?;
+        if kind.is_dir() {
+            paths.push(entry.path());
+        }
+    }
+    paths.sort_by(|left, right| {
+        left.file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_lowercase()
+            .cmp(
+                &right
+                    .file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .to_lowercase(),
+            )
+            .then_with(|| left.cmp(right))
+    });
+    let mut seen = paths.iter().cloned().collect::<HashSet<_>>();
+    for promoted in &section.promote {
+        let path = resolve_section_path(&root, promoted)?;
+        if !path.is_dir() {
+            return Err(format!("promoted path is not a folder: {}", path.display()));
+        }
+        if path != root && seen.insert(path.clone()) {
             paths.push(path);
         }
-    }
-
-    if section.children {
-        let entries = fs::read_dir(&root)
-            .map_err(|error| format!("cannot read section root {}: {error}", root.display()))?;
-        let mut children = Vec::new();
-        for entry in entries {
-            let entry = entry
-                .map_err(|error| format!("cannot read section root {}: {error}", root.display()))?;
-            if entry.file_name().to_string_lossy().starts_with('.') {
-                continue;
-            }
-            let kind = entry.file_type().map_err(|error| {
-                format!(
-                    "cannot inspect section child {}: {error}",
-                    entry.path().display()
-                )
-            })?;
-            if kind.is_dir() {
-                children.push(entry.path());
-            }
-        }
-        children.sort_by(|left, right| {
-            left.file_name()
-                .unwrap_or_default()
-                .to_string_lossy()
-                .to_lowercase()
-                .cmp(
-                    &right
-                        .file_name()
-                        .unwrap_or_default()
-                        .to_string_lossy()
-                        .to_lowercase(),
-                )
-                .then_with(|| left.cmp(right))
-        });
-        for child in children {
-            if seen.insert(child.clone()) {
-                paths.push(child);
-            }
-        }
-    }
-
-    let move_here = section
-        .move_here
-        .iter()
-        .map(|path| resolve_section_path(&root, path))
-        .collect::<Result<HashSet<_>, _>>()?;
-    if let Some(path) = move_here.iter().find(|path| !seen.contains(*path)) {
-        return Err(format!(
-            "move_here path is not a pin or discovered child: {}",
-            path.display()
-        ));
     }
 
     let group = root.to_string_lossy().into_owned();
@@ -247,7 +220,6 @@ fn materialize_section(section: Section) -> Result<Vec<Location>, String> {
             .to_string_lossy()
             .into_owned(),
         path: group.clone(),
-        move_here: false,
         root: Some(group.clone()),
         is_section_root: true,
     }];
@@ -259,7 +231,6 @@ fn materialize_section(section: Section) -> Result<Vec<Location>, String> {
                 .unwrap_or(path.as_os_str())
                 .to_string_lossy()
                 .into_owned(),
-            move_here: move_here.contains(&path),
             path: path.to_string_lossy().into_owned(),
             root: Some(group.clone()),
             is_section_root: false,
@@ -320,8 +291,12 @@ fn open_location(config: Config, selector: Option<&str>) -> Result<(), String> {
 }
 
 fn move_files(config: Config, inputs: Vec<String>) -> Result<(), String> {
-    if !config.locations.iter().any(|location| location.move_here) {
-        return Err("config has no locations with move_here = true".into());
+    if !config
+        .locations
+        .iter()
+        .any(|location| !location.is_section_root)
+    {
+        return Err("config has no folder destinations".into());
     }
 
     let paths: Vec<&str> = if inputs.is_empty() {
@@ -521,26 +496,11 @@ mod tests {
     }
 
     #[test]
-    fn starter_config_is_universal_and_supports_both_commands() {
+    fn starter_config_uses_the_current_section_format() {
         let parsed: ConfigFile = toml::from_str(include_str!("../config.example.toml")).unwrap();
-        let config = materialize_config(parsed).unwrap();
-        let paths: Vec<&str> = config
-            .locations
-            .iter()
-            .filter(|location| !location.is_section_root)
-            .map(|location| location.path.as_str())
-            .collect();
-
-        let home = env::var("HOME").unwrap();
-        assert_eq!(
-            paths,
-            vec![
-                format!("{home}/Desktop"),
-                format!("{home}/Downloads"),
-                format!("{home}/Documents")
-            ]
-        );
-        assert!(config.locations.iter().any(|location| location.move_here));
+        assert_eq!(parsed.version, 2);
+        assert_eq!(parsed.sections.len(), 1);
+        assert_eq!(parsed.sections[0].root, "~/Documents");
     }
 
     #[test]
@@ -563,7 +523,6 @@ move_here = true
         assert_eq!(config.locations[0].path, "~/Documents/Archive");
         assert_eq!(config.locations[0].root, None);
         assert!(!config.locations[0].is_section_root);
-        assert!(config.locations[0].move_here);
     }
 
     #[test]
@@ -572,7 +531,7 @@ move_here = true
             r#"
 [[sections]]
 root = "~"
-pins = ["Documents"]
+promote = ["Documents/Archive"]
 "#,
         )
         .unwrap();
@@ -584,7 +543,7 @@ pins = ["Documents"]
     }
 
     #[test]
-    fn section_combines_pins_at_any_depth_and_direct_children() {
+    fn section_combines_direct_children_and_promoted_descendants() {
         let temp = tempfile::tempdir().unwrap();
         let root = temp.path().join("Library");
         let books = root.join("Books");
@@ -595,9 +554,7 @@ pins = ["Documents"]
         }
         let section = Section {
             root: root.to_string_lossy().into_owned(),
-            children: true,
-            pins: vec!["Books".into(), "Guides/English".into()],
-            move_here: vec!["Books".into()],
+            promote: vec!["Guides/English".into()],
         };
 
         let locations = materialize_section(section).unwrap();
@@ -606,14 +563,13 @@ pins = ["Documents"]
             .filter(|location| !location.is_section_root)
             .map(|location| PathBuf::from(&location.path))
             .collect::<Vec<_>>();
-        assert_eq!(paths, vec![books, english, guides]);
-        assert!(locations[1].move_here);
+        assert_eq!(paths, vec![books, guides, english]);
         assert_eq!(locations[0].root.as_deref(), root.to_str());
         assert!(locations[0].is_section_root);
     }
 
     #[test]
-    fn section_rejects_a_pin_outside_its_root() {
+    fn section_rejects_a_promoted_path_outside_its_root() {
         let temp = tempfile::tempdir().unwrap();
         let root = temp.path().join("Library");
         let outside = temp.path().join("Storage");
@@ -621,9 +577,7 @@ pins = ["Documents"]
         fs::create_dir_all(&outside).unwrap();
         let section = Section {
             root: root.to_string_lossy().into_owned(),
-            children: false,
-            pins: vec![outside.to_string_lossy().into_owned()],
-            move_here: Vec::new(),
+            promote: vec![outside.to_string_lossy().into_owned()],
         };
 
         let error = materialize_section(section).err().unwrap();
@@ -632,27 +586,30 @@ pins = ["Documents"]
     }
 
     #[test]
-    fn section_rejects_move_destination_that_is_not_visible() {
+    fn section_rejects_a_promoted_path_that_is_not_a_folder() {
         let temp = tempfile::tempdir().unwrap();
+        let file = temp.path().join("note.txt");
+        fs::write(&file, "note").unwrap();
         let section = Section {
             root: temp.path().to_string_lossy().into_owned(),
-            children: false,
-            pins: Vec::new(),
-            move_here: vec!["Invoices".into()],
+            promote: vec!["note.txt".into()],
         };
 
-        assert!(materialize_section(section).is_err());
+        assert!(
+            materialize_section(section)
+                .err()
+                .unwrap()
+                .contains("promoted path is not a folder")
+        );
     }
 
     #[test]
-    fn section_root_is_available_without_children_or_pins() {
+    fn section_root_is_available_without_children_or_promotions() {
         let temp = tempfile::tempdir().unwrap();
         let root = temp.path().to_string_lossy().into_owned();
         let section = Section {
             root: root.clone(),
-            children: false,
-            pins: Vec::new(),
-            move_here: Vec::new(),
+            promote: Vec::new(),
         };
 
         let locations = materialize_section(section).unwrap();
