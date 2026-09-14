@@ -4,6 +4,15 @@ Tracks real product and release progress.
 
 ## [Unreleased]
 
+### Added
+
+- Added config version 2 sections with explicit roots, ordered pins at any depth, optional immediate-child discovery, path deduplication, and explicit PDF-move allowlists.
+
+### Changed
+
+- Made `<sector>0` stable for version 2 sections instead of inferring the root from their current entries, while preserving legacy `[[locations]]` configs.
+- Show parent context for deep and outside-root pins, and fixed expansion of the exact `~` home path.
+
 ## [0.1.1] - 2026-09-05
 
 ### Changed

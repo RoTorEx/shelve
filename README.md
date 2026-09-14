@@ -49,10 +49,43 @@ This installs `shelve` to `~/.x-cli-shelve/bin`, adds that directory to the
 active shell profile when needed, and creates
 `~/.config/shelve/config.toml` without replacing an existing config.
 
-All `open` destinations come from `[[locations]]` in that config. The starter
-config includes Home, Desktop, Downloads, and Documents; add any workspaces,
-archives, projects, or other important folders there. `move_here = true` makes
-a location available to `shelve move` as well.
+The current config format uses sections with explicit roots:
+
+```toml
+version = 2
+inboxes = ["~/Desktop", "~/Downloads"]
+
+[[sections]]
+root = "~/Documents/WorkSpace/Library"
+children = true
+pins = [
+  "Books",
+  "Guides/English",
+  "~/Documents/Storage",
+]
+```
+
+`<sector>0` always opens the configured `root`. Relative pins are resolved from
+that root, while pins beginning with `~` or `/` may live elsewhere but remain
+in the same section. Pins appear first in config order. `children = true`
+appends the root's other immediate, non-hidden directories alphabetically;
+Shelve does not recursively flood the menu. Duplicate paths are shown once.
+Omit both `pins` and `children` when a section should expose only its root via
+`<sector>0`.
+
+Use `move_here` as an explicit allowlist. Every listed path must also be a pin
+or an automatically discovered child:
+
+```toml
+[[sections]]
+root = "~/Documents/WorkSpace/Business/PL JDG"
+children = true
+pins = ["In Invoices", "Out Invoices"]
+move_here = ["In Invoices", "Out Invoices"]
+```
+
+Legacy `[[locations]]` configs remain supported. In that format,
+`move_here = true` on an individual location retains its existing meaning.
 
 The build output lives under `~/construction_side/shelve/target`.
 
@@ -67,11 +100,12 @@ make run
 
 MIT
 
-Group headers and folder names come from actual path components, never custom
-labels. Headers show the root name followed by its parent path, matching Hop. `<letter>0` opens that root without
-adding a numbered root entry; folders start at 1. Root shortcuts are open-only
-and cannot be used to bypass `move_here` restrictions. Relative path context is
-shown only when a folder is deeper than the group root.
+Section headers and folder names come from actual path components, never custom
+labels. Headers show the explicit root name followed by its parent path,
+matching Hop. `<letter>0` opens that root without adding a numbered root entry;
+folders start at 1. Root shortcuts are open-only and cannot be used to bypass
+`move_here` restrictions. A deeper pin shows its parent relative to the root;
+a pin outside the root shows its home-relative or absolute parent.
 
 The menu follows Hop’s spacing and color roles, with a dim version and dividers,
 a parent path in each sector heading, and a single short input prompt. Usage

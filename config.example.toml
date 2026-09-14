@@ -1,24 +1,11 @@
 # Folders scanned by `shelve move` when no input path is provided.
+version = 2
 inboxes = ["~/Desktop", "~/Downloads"]
 
-# `shelve open` shows every location. Add any folders that matter to you.
-[[locations]]
-group = "Quick Access"
-label = "Home"
-path = "~"
-
-[[locations]]
-group = "Quick Access"
-label = "Desktop"
-path = "~/Desktop"
-
-[[locations]]
-group = "Quick Access"
-label = "Downloads"
-path = "~/Downloads"
-
-[[locations]]
-group = "Quick Access"
-label = "Documents"
-path = "~/Documents"
-move_here = true
+# A section has a stable root, opened with `<sector>0`. Pins are resolved
+# relative to that root and keep their configured order. Set children = true to
+# append the root's other immediate, non-hidden directories alphabetically.
+[[sections]]
+root = "~"
+pins = ["Desktop", "Downloads", "Documents"]
+move_here = ["Documents"]

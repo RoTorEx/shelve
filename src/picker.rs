@@ -6,6 +6,7 @@ use std::{
 
 struct Group<'a> {
     name: &'a str,
+    root: Option<&'a str>,
     locations: Vec<&'a Location>,
 }
 
@@ -13,11 +14,18 @@ fn groups(locations: &[Location]) -> Vec<Group<'_>> {
     let mut groups: Vec<Group<'_>> = Vec::new();
     for location in locations {
         if let Some(group) = groups.iter_mut().find(|group| group.name == location.group) {
-            group.locations.push(location);
+            if !location.is_section_root {
+                group.locations.push(location);
+            }
         } else {
             groups.push(Group {
                 name: &location.group,
-                locations: vec![location],
+                root: location.root.as_deref(),
+                locations: if location.is_section_root {
+                    Vec::new()
+                } else {
+                    vec![location]
+                },
             });
         }
     }
@@ -71,6 +79,8 @@ pub(crate) fn resolve(
             label: folder_name(root),
             path: root.to_string_lossy().into_owned(),
             move_here: false,
+            root: group.root.map(str::to_owned),
+            is_section_root: group.root.is_some(),
         });
     }
     let location = group
@@ -100,6 +110,9 @@ fn folder_name(path: &Path) -> String {
 }
 
 fn shared_parent<'a>(group: &Group<'a>) -> Option<&'a Path> {
+    if let Some(root) = group.root {
+        return Some(Path::new(root));
+    }
     let first = Path::new(&group.locations.first()?.path);
     let mut base = if group.locations.len() == 1 {
         first.parent()?
@@ -138,6 +151,30 @@ fn display_path(path: &Path) -> String {
     path.display().to_string()
 }
 
+fn root_name(path: &Path) -> String {
+    if display_path(path) == "~" {
+        "~".into()
+    } else {
+        folder_name(path)
+    }
+}
+
+fn location_context(path: &Path, root: Option<&Path>) -> String {
+    let parent = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty());
+    let context = match root {
+        Some(root) if path.starts_with(root) => parent
+            .and_then(|parent| parent.strip_prefix(root).ok())
+            .filter(|relative| !relative.as_os_str().is_empty())
+            .map(|relative| format!("{}/", relative.display())),
+        _ => parent.map(|parent| format!("{}/", display_path(parent))),
+    };
+    context
+        .map(|context| format!(" ({context})"))
+        .unwrap_or_default()
+}
+
 fn render(
     out: &mut impl Write,
     title: &str,
@@ -171,19 +208,18 @@ fn render(
         writeln!(out, "\n  {} {}", paint(color, "1", "File:"), file)?;
     }
     for (index, group) in groups(locations).iter().enumerate() {
-        if !group
-            .locations
-            .iter()
-            .any(|location| !move_only || location.move_here)
-        {
+        if move_only && !group.locations.iter().any(|location| location.move_here) {
             continue;
         }
         let parent = shared_parent(group);
         let context = parent
-            .map(|root| {
+            .and_then(|root| {
+                if display_path(root) == "~" {
+                    return None;
+                }
                 root.parent()
                     .filter(|path| !path.as_os_str().is_empty())
-                    .unwrap_or(root)
+                    .or(Some(root))
             })
             .map(|path| format!(" ({}/)", display_path(path).trim_end_matches('/')))
             .unwrap_or_default();
@@ -194,31 +230,15 @@ fn render(
             paint(
                 color,
                 "1",
-                &parent.map(folder_name).unwrap_or_else(|| group.name.into())
+                &parent.map(root_name).unwrap_or_else(|| group.name.into())
             ),
             paint(color, "90", &context)
         )?;
         for (index, location) in group.locations.iter().enumerate() {
             if !move_only || location.move_here {
-                let path = match parent {
-                    Some(parent) => Path::new(&location.path)
-                        .strip_prefix(parent)
-                        .unwrap_or(Path::new(&location.path)),
-                    None => Path::new(&location.path),
-                };
-                let name = folder_name(Path::new(&location.path));
-                let context = if parent.is_some() && path.to_string_lossy() == name {
-                    String::new()
-                } else {
-                    format!(
-                        " ({})",
-                        if path.as_os_str().is_empty() {
-                            ".".into()
-                        } else {
-                            path.display().to_string()
-                        }
-                    )
-                };
+                let path = Path::new(&location.path);
+                let name = folder_name(path);
+                let context = location_context(path, parent);
                 writeln!(
                     out,
                     "     {} {}{}",
@@ -317,6 +337,8 @@ pub(crate) fn choose_sources(
             label: folder_name(path),
             path: path.to_string_lossy().into_owned(),
             move_here: false,
+            root: None,
+            is_section_root: false,
         })
         .collect();
     let color = io::stderr().is_terminal()
@@ -353,6 +375,8 @@ mod tests {
                 label: name.into(),
                 path: format!("/inbox/{name}"),
                 move_here: false,
+                root: None,
+                is_section_root: false,
             })
             .collect();
         assert_eq!(
@@ -380,6 +404,8 @@ mod tests {
             label: label.into(),
             path: format!("/{label}"),
             move_here,
+            root: None,
+            is_section_root: false,
         })
         .collect()
     }
@@ -427,6 +453,8 @@ mod tests {
             label: "Custom alias".into(),
             path: "~/Documents/Business/In Invoices".into(),
             move_here: true,
+            root: None,
+            is_section_root: false,
         }];
         assert_eq!(
             resolve(&locations, "a0", false).unwrap().path,
@@ -447,6 +475,39 @@ mod tests {
     }
 
     #[test]
+    fn explicit_section_root_is_stable_and_deep_context_shows_the_parent() {
+        let locations = vec![
+            Location {
+                group: "/workspace/Library".into(),
+                label: "English".into(),
+                path: "/workspace/Library/Guides/English".into(),
+                move_here: false,
+                root: Some("/workspace/Library".into()),
+                is_section_root: false,
+            },
+            Location {
+                group: "/workspace/Library".into(),
+                label: "Storage".into(),
+                path: "/archive/Storage".into(),
+                move_here: false,
+                root: Some("/workspace/Library".into()),
+                is_section_root: false,
+            },
+        ];
+
+        assert_eq!(
+            resolve(&locations, "A0", false).unwrap().path,
+            "/workspace/Library"
+        );
+        let mut out = Vec::new();
+        render(&mut out, "Folders", &locations, false, false).unwrap();
+        let text = String::from_utf8(out).unwrap();
+        assert!(text.contains("A.  Library (/workspace/)"));
+        assert!(text.contains("1) English (Guides/)"));
+        assert!(text.contains("2) Storage (/archive/)"));
+    }
+
+    #[test]
     fn supports_multiletter_groups_and_multidigit_positions() {
         assert_eq!(group_label(25), "Z");
         assert_eq!(group_label(26), "AA");
@@ -457,6 +518,8 @@ mod tests {
                 label: "Folder".into(),
                 path: "/folder".into(),
                 move_here: false,
+                root: None,
+                is_section_root: false,
             });
         }
         assert_eq!(resolve(&locations, "AA1", false).unwrap().group, "Group 24");
