@@ -4,6 +4,8 @@ Tracks real product and release progress.
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-10-09
+
 ### Fixed
 
 - Let Esc cancel folder and source-file menus immediately, including after partial input, matching Hop; restore terminal input mode on exit. Ctrl-C and Ctrl-D also cancel.
