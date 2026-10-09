@@ -1,4 +1,6 @@
 use crate::Location;
+use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
+use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
 use std::{
     io::{self, BufRead, IsTerminal, Write},
     path::Path,
@@ -246,20 +248,104 @@ fn render(
     writeln!(out)
 }
 
+fn read_choice(
+    input: &mut impl BufRead,
+    out: &mut impl Write,
+    terminal: bool,
+    action: &str,
+    color: bool,
+) -> io::Result<String> {
+    let _raw_input = if terminal {
+        enable_raw_mode()?;
+        Some(RawInput)
+    } else {
+        None
+    };
+    prompt_line(out, action, color)?;
+    if terminal {
+        return read_terminal_choice(out);
+    }
+    let mut line = String::new();
+    input.read_line(&mut line)?;
+    Ok(line)
+}
+
+struct RawInput;
+
+impl Drop for RawInput {
+    fn drop(&mut self) {
+        let _ = disable_raw_mode();
+    }
+}
+
+fn read_terminal_choice(output: &mut impl Write) -> io::Result<String> {
+    let mut input = String::new();
+    loop {
+        let Event::Key(key) = event::read()? else {
+            continue;
+        };
+        if key.kind == KeyEventKind::Release {
+            continue;
+        }
+        match key.code {
+            KeyCode::Esc => {
+                write!(output, "\r\n")?;
+                output.flush()?;
+                return Ok(String::new());
+            }
+            KeyCode::Enter => {
+                write!(output, "\r\n")?;
+                output.flush()?;
+                return Ok(input.trim().to_owned());
+            }
+            KeyCode::Char('c' | 'd') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                write!(output, "\r\n")?;
+                output.flush()?;
+                return Ok(String::new());
+            }
+            KeyCode::Backspace if !input.is_empty() => {
+                input.pop();
+                write!(output, "\x08 \x08")?;
+            }
+            KeyCode::Char('u') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                for _ in input.chars() {
+                    write!(output, "\x08 \x08")?;
+                }
+                input.clear();
+            }
+            KeyCode::Char(ch)
+                if ch.is_ascii()
+                    && !ch.is_control()
+                    && !key
+                        .modifiers
+                        .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) =>
+            {
+                input.push(ch);
+                write!(output, "{ch}")?;
+            }
+            _ => {}
+        }
+        output.flush()?;
+    }
+}
+
 fn prompt(
     input: &mut impl BufRead,
     out: &mut impl Write,
     locations: &[Location],
     move_only: bool,
     color: bool,
+    terminal: bool,
 ) -> Result<Option<Location>, String> {
     loop {
-        prompt_line(out, if move_only { "move to" } else { "open" }, color)
-            .map_err(|e| e.to_string())?;
-        let mut line = String::new();
-        input
-            .read_line(&mut line)
-            .map_err(|e| format!("cannot read selection: {e}"))?;
+        let line = read_choice(
+            input,
+            out,
+            terminal,
+            if move_only { "move to" } else { "open" },
+            color,
+        )
+        .map_err(|e| format!("cannot read selection: {e}"))?;
         let choice = line.trim();
         if choice.is_empty() || choice.eq_ignore_ascii_case("q") || choice == "\u{1b}" {
             return Ok(None);
@@ -287,6 +373,7 @@ pub(crate) fn choose(
         locations,
         move_only,
         color,
+        io::stdin().is_terminal(),
     )
 }
 
@@ -341,9 +428,14 @@ pub(crate) fn choose_sources(
     render(&mut out, "Files", &locations, false, color).map_err(|e| e.to_string())?;
     let mut input = io::stdin().lock();
     loop {
-        prompt_line(&mut out, "move", color).map_err(|e| e.to_string())?;
-        let mut line = String::new();
-        input.read_line(&mut line).map_err(|e| e.to_string())?;
+        let line = read_choice(
+            &mut input,
+            &mut out,
+            io::stdin().is_terminal(),
+            "move",
+            color,
+        )
+        .map_err(|e| format!("cannot read selection: {e}"))?;
         let choice = line.trim();
         if choice.is_empty() || choice.eq_ignore_ascii_case("q") || choice == "\u{1b}" {
             return Ok(None);
@@ -510,21 +602,29 @@ mod tests {
     fn invalid_input_retries_and_eof_or_empty_input_cancels() {
         let locations = locations();
         let mut out = Vec::new();
-        let selected = prompt(&mut &b"Z8\nb2\n"[..], &mut out, &locations, false, false)
-            .unwrap()
-            .unwrap();
+        let selected = prompt(
+            &mut &b"Z8\nb2\n"[..],
+            &mut out,
+            &locations,
+            false,
+            false,
+            false,
+        )
+        .unwrap()
+        .unwrap();
         assert_eq!(selected.label, "Invoices");
         assert!(
             String::from_utf8(out)
                 .unwrap()
                 .contains("unknown destination")
         );
-        for input in ["", "\n", "q\n"] {
+        for input in ["", "\n", "q\n", "\u{1b}\n"] {
             assert!(
                 prompt(
                     &mut input.as_bytes(),
                     &mut Vec::new(),
                     &locations,
+                    false,
                     false,
                     false
                 )

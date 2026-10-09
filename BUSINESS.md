@@ -28,8 +28,10 @@ explicit `update` command and installation from GitHub Releases.
 
 Folder navigation follows Hop: a scrollback menu with lettered groups,
 numbered folders, visible spacing, and typed selectors such as `A1` followed by
-Enter. `shelve open A1` opens a known folder without the menu. Blank input, EOF,
-or `q` cancels; invalid selectors report an error without selecting a fallback.
+Enter. `shelve open A1` opens a known folder without the menu. Esc cancels
+immediately, even after partial input; Ctrl-C and Ctrl-D also cancel. Blank
+input, EOF, or `q` cancels; invalid selectors report an error without selecting
+a fallback.
 
 Sections follow config order, and items are sorted by full resolved path within
 each section. Duplicate item paths are shown once. Shelve performs no automatic

@@ -20,8 +20,9 @@ current binary.
 The folder menu follows Hop: lettered groups (`A`, `B`, …) and numbered
 folders (`1`, `2`, …), with blank lines between groups and indented entries.
 Type `B2` and press Enter to choose a folder. Codes are case-insensitive.
-Empty input or `q` followed by Enter cancels. The menu stays in terminal
-scrollback, so you can scroll to review all groups.
+Esc cancels immediately, including after typing a partial selector. Empty input
+or `q` followed by Enter also cancels. Ctrl-C and Ctrl-D cancel as in Hop.
+The menu stays in terminal scrollback, so you can scroll to review all groups.
 
 Use `shelve open B2` to open a known destination directly. Codes follow section
 and folder order and remain the same in `open` and `move`; every displayed
