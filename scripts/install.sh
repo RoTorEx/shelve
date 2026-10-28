@@ -3,8 +3,8 @@ set -eu
 
 repo="${SHELVE_INSTALL_REPO:-RoTorEx/shelve}"
 version="${SHELVE_VERSION:-latest}"
-install_dir="${SHELVE_INSTALL_DIR:-$HOME/.x-cli-shelve}"
-config_dir="${SHELVE_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/shelve}"
+install_dir="${SHELVE_INSTALL_DIR:-$HOME/.toolbelt/shelve}"
+config_dir="${SHELVE_CONFIG_DIR:-$HOME/.toolbelt/shelve}"
 archive_path=""
 update_path=1
 
@@ -86,8 +86,8 @@ fi
 
 if [ "$update_path" -eq 1 ]; then
     case "${SHELL:-}" in */bash) profile="$HOME/.bashrc" ;; *) profile="$HOME/.zshrc" ;; esac
-    if [ "$install_dir" = "$HOME/.x-cli-shelve" ]; then
-        line='export PATH="$HOME/.x-cli-shelve/bin:$PATH"'
+    if [ "$install_dir" = "$HOME/.toolbelt/shelve" ]; then
+        line='export PATH="$HOME/.toolbelt/shelve/bin:$PATH"'
     else
         line="export PATH=\"$install_dir/bin:\$PATH\""
     fi

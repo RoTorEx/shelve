@@ -3,7 +3,7 @@
 BIN_NAME := shelve
 CONSTRUCTION_SIDE ?= $(HOME)/construction_side
 CARGO_TARGET_DIR ?= $(CONSTRUCTION_SIDE)/shelve/target
-INSTALL_DIR ?= $(HOME)/.x-cli-shelve
+INSTALL_DIR ?= $(HOME)/.toolbelt/shelve
 DIST_DIR ?= $(CONSTRUCTION_SIDE)/shelve/dist
 TARGET ?= $(shell rustc -vV | sed -n 's/^host: //p')
 VERSION := $(shell sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n 1)

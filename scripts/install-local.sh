@@ -3,7 +3,7 @@ set -eu
 
 binary="${1:?binary path is required}"
 install_dir="${2:?install directory is required}"
-config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/shelve"
+config_dir="${SHELVE_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.toolbelt}/shelve}"
 
 [ -x "$binary" ] || { echo "ERROR: missing binary $binary" >&2; exit 1; }
 mkdir -p "$install_dir/bin" "$config_dir"
@@ -23,7 +23,7 @@ else
 fi
 
 case "${SHELL:-}" in */bash) profile="$HOME/.bashrc" ;; *) profile="$HOME/.zshrc" ;; esac
-line='export PATH="$HOME/.x-cli-shelve/bin:$PATH"'
+line='export PATH="$HOME/.toolbelt/shelve/bin:$PATH"'
 touch "$profile"
 grep -Fqx "$line" "$profile" || printf '\n# x-cli-shelve\n%s\n' "$line" >> "$profile"
 

@@ -105,7 +105,7 @@ fn config_path() -> Result<PathBuf, String> {
     }
     env::var_os("HOME")
         .map(PathBuf::from)
-        .map(|home| home.join(".config/shelve/config.toml"))
+        .map(|home| home.join(".toolbelt/shelve/config.toml"))
         .ok_or_else(|| "HOME is not set".to_string())
 }
 

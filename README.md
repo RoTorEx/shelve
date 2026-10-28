@@ -37,7 +37,7 @@ curl -fsSL https://github.com/RoTorEx/shelve/releases/latest/download/shelve-ins
 ```
 
 The installer supports Apple Silicon and Intel macOS, verifies the release
-archive checksum, installs to `~/.x-cli-shelve/bin`, and preserves an existing
+archive checksum, installs to `~/.toolbelt/shelve/bin`, and preserves an existing
 configuration.
 
 ## Build and install locally
@@ -46,9 +46,9 @@ configuration.
 make install-local
 ```
 
-This installs `shelve` to `~/.x-cli-shelve/bin`, adds that directory to the
+This installs `shelve` to `~/.toolbelt/shelve/bin`, adds that directory to the
 active shell profile when needed, and creates
-`~/.config/shelve/config.toml` without replacing an existing config.
+`~/.toolbelt/shelve/config.toml` without replacing an existing config.
 
 The current config format uses sections with explicit roots:
 
