@@ -67,3 +67,10 @@ Source and destination menus use the same renderer and prompt styling as open.
 Source headings say Files; destinations say Folders, with the source filename
 on a separate line so long filenames do not expand the divider. Home paths
 use `~` consistently. Multi-file codes remain space- or comma-separated.
+
+## Local product usage evidence
+
+Record meaningful workflow outcomes locally, with bounded storage and no source
+content. [Usage logging](docs/usage-logging.md) owns the event and retention
+contract. Successful API calls, prepared artifacts and user-reported outcomes
+must not be presented as broader business success.

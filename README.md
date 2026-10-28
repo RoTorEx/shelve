@@ -100,3 +100,8 @@ every item remains under its section root.
 The menu follows Hop’s spacing and color roles, with a dim version and dividers,
 a parent path in each sector heading, and a single short input prompt. Usage
 help stays in documentation rather than appearing below every menu.
+
+## Local usage logs
+
+See [usage logging](docs/usage-logging.md) for product events, privacy, paths,
+rotation and interpretation limits.

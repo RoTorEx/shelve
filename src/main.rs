@@ -7,6 +7,8 @@ use std::{
     process::{self, Command},
 };
 
+mod usage;
+use serde_json::json;
 mod picker;
 mod update;
 
@@ -59,7 +61,13 @@ struct MovePlan {
 }
 
 fn main() {
-    if let Err(error) = run() {
+    if let Ok(path) = config_path() {
+        usage::init("shelve", path.with_file_name("logs").join("events.jsonl"));
+    }
+    let operation = usage::Operation::start("command");
+    let result = run();
+    operation.finish(if result.is_ok() { "success" } else { "error" }, json!({}));
+    if let Err(error) = result {
         eprintln!("shelve: {error}");
         process::exit(1);
     }
@@ -76,12 +84,19 @@ fn run() -> Result<(), String> {
             open_location(load_config()?, selector.as_deref())
         }
         Some("move") => move_files(load_config()?, args.collect()),
-        Some("update") => update::run().map_err(|error| error.to_string()),
+        Some("update") => {
+            let op = usage::Operation::start("update");
+            let result = update::run().map_err(|error| error.to_string());
+            op.finish(if result.is_ok() { "success" } else { "error" }, json!({}));
+            result
+        }
         Some("--version" | "-V") => {
+            usage::event("probe", "success", json!({"mode":"version"}));
             println!("shelve {}", env!("CARGO_PKG_VERSION"));
             Ok(())
         }
         Some("--help" | "-h") | None => {
+            usage::event("probe", "success", json!({"mode":"help"}));
             print_help();
             Ok(())
         }
@@ -235,12 +250,19 @@ fn resolve_section_path(root: &Path, configured: &str) -> Result<PathBuf, String
 }
 
 fn open_location(config: Config, selector: Option<&str>) -> Result<(), String> {
+    let operation = usage::Operation::start("folder_open");
+    usage::event(
+        "folder_selection",
+        "started",
+        json!({"mode": if selector.is_some() {"direct"} else {"interactive"}}),
+    );
     let location = if let Some(selector) = selector {
         Some(picker::resolve(&config.locations, selector, false)?)
     } else {
         picker::choose("Folders", &config.locations, false)?
     };
     let Some(location) = location else {
+        operation.finish("canceled", json!({"stage":"selection"}));
         println!("Cancelled.");
         return Ok(());
     };
@@ -255,10 +277,12 @@ fn open_location(config: Config, selector: Option<&str>) -> Result<(), String> {
     if !status.success() {
         return Err(format!("Finder could not open {}", path.display()));
     }
+    operation.finish("success", json!({"stage":"finder_request_accepted"}));
     Ok(())
 }
 
 fn move_files(config: Config, inputs: Vec<String>) -> Result<(), String> {
+    let operation = usage::Operation::start("file_move");
     if !config
         .locations
         .iter()
@@ -273,16 +297,20 @@ fn move_files(config: Config, inputs: Vec<String>) -> Result<(), String> {
         inputs.iter().map(String::as_str).collect()
     };
     let sources = collect_pdfs(&paths)?;
+    usage::event("move_candidates", "ready", json!({"count":sources.len()}));
     if sources.is_empty() {
+        operation.finish("no_op", json!({"reason":"empty_source"}));
         println!("No PDFs found.");
         return Ok(());
     }
 
     let Some(sources) = picker::choose_sources(&sources)? else {
+        operation.finish("canceled", json!({"stage":"source_selection"}));
         println!("Cancelled.");
         return Ok(());
     };
 
+    usage::event("move_selected", "ready", json!({"count":sources.len()}));
     let mut plans = Vec::new();
     for source in sources {
         let prompt = format!(
@@ -290,6 +318,7 @@ fn move_files(config: Config, inputs: Vec<String>) -> Result<(), String> {
             source.file_name().unwrap_or_default().to_string_lossy()
         );
         let Some(location) = picker::choose(&prompt, &config.locations, true)? else {
+            operation.finish("canceled", json!({"stage":"destination_selection"}));
             println!("Cancelled.");
             return Ok(());
         };
@@ -327,7 +356,17 @@ fn move_files(config: Config, inputs: Vec<String>) -> Result<(), String> {
     }
 
     let ready = plans.iter().filter(|plan| plan.ready).count();
+    let skipped = plans.len() - ready;
+    usage::event(
+        "move_preview",
+        "ready",
+        json!({"ready":ready,"skipped":skipped}),
+    );
     if ready == 0 {
+        operation.finish(
+            "no_op",
+            json!({"reason":"no_ready_files","skipped":skipped}),
+        );
         println!("Nothing to move.");
         return Ok(());
     }
@@ -336,6 +375,7 @@ fn move_files(config: Config, inputs: Vec<String>) -> Result<(), String> {
         .prompt()
         .map_err(|error| error.to_string())?
     {
+        operation.finish("canceled", json!({"stage":"confirmation"}));
         println!("Cancelled.");
         return Ok(());
     }
@@ -354,6 +394,16 @@ fn move_files(config: Config, inputs: Vec<String>) -> Result<(), String> {
             }
         }
     }
+    operation.finish(
+        if failed == 0 {
+            "success"
+        } else if moved > 0 {
+            "partial"
+        } else {
+            "error"
+        },
+        json!({"moved":moved,"failed":failed,"skipped":skipped}),
+    );
     println!("Done: {moved} moved, {failed} failed.");
     if failed == 0 {
         Ok(())
